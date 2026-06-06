@@ -549,33 +549,43 @@ Each instance has its own LevelDB directory and process — completely independe
 ## Docker
 
 ```bash
-# Run with Docker
-docker run -p 8545:8545 lord1egypt/ethsmith
+# Run (ephemeral — fresh chain every restart)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest
 
-# With persistent state
-docker run -p 8545:8545 -v $(pwd)/data:/root/.ethsmith lord1egypt/ethsmith
+# With persistent state — state survives container restarts
+docker run -p 8545:8545 -v ethsmith-data:/root/.ethsmith/db lord1egypt/ethsmith:latest
+
+# With persistent state — bind-mount to local folder
+docker run -p 8545:8545 -v $(pwd)/data:/root/.ethsmith/db lord1egypt/ethsmith:latest
 
 # Fork mainnet
-docker run -p 8545:8545 lord1egypt/ethsmith ethsmith --fork.network mainnet
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network mainnet
 
-# docker-compose for multi-instance
+# Custom chain ID and deterministic accounts
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic --chain-id 31337
 ```
+
+> **Volume path:** always mount to `/root/.ethsmith/db` — Foundry binaries live in `/root/.ethsmith/bin`
+> inside the image layer and must not be shadowed by the volume.
 
 ```yaml
 # docker-compose.yml
 version: '3.8'
 services:
   node-dev:
-    image: lord1egypt/ethsmith
+    image: lord1egypt/ethsmith:latest
     ports: ['8545:8545']
-    volumes: ['./data/dev:/root/.ethsmith']
-    command: ethsmith --deterministic --chain-id 1337
+    volumes: ['./data/dev:/root/.ethsmith/db']
+    command: node --deterministic --chain-id 1337
 
   node-fork:
-    image: lord1egypt/ethsmith
+    image: lord1egypt/ethsmith:latest
     ports: ['8546:8545']
-    volumes: ['./data/fork:/root/.ethsmith']
-    command: ethsmith --fork.network mainnet
+    volumes: ['./data/fork:/root/.ethsmith/db']
+    command: node --fork.network mainnet
+
+volumes:
+  ethsmith-data:
 ```
 
 ---
