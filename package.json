@@ -1,6 +1,6 @@
 {
   "name": "ethsmith",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Unified Ethereum dev toolkit — Ganache-compatible API powered by Foundry (Forge + Cast + Anvil + Chisel) with LevelDB persistence",
   "main": "src/index.js",
   "bin": {
@@ -56,6 +56,7 @@
     "level": "^8.0.0",
     "axios": "^1.6.0",
     "tar": "^7.0.0",
+    "unzipper": "^0.12.3",
     "ethers": "^6.0.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0"

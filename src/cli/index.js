@@ -237,6 +237,16 @@ function buildCLI() {
       console.log()
     })
 
+  // ── UPDATE ────────────────────────────────────────────────────────────────
+  program
+    .command('update')
+    .description('Update Foundry binaries to the latest version')
+    .option('--check', 'check for updates without installing')
+    .action(async (opts) => {
+      const { updateFoundry } = require('../core/updater')
+      await updateFoundry(opts)
+    })
+
   // ── CHISEL ─────────────────────────────────────────────────────────────────
   program
     .command('repl [args...]')

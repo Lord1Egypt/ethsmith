@@ -1,0 +1,122 @@
+name: Build musl Foundry binaries
+
+# Builds statically-linked Foundry binaries for musl libc targets
+# (Alpine Linux, Termux, Android UserLand, etc.)
+# Triggered manually or weekly — takes ~30-45 min per target
+
+on:
+  workflow_dispatch:
+    inputs:
+      foundry_ref:
+        description: 'Foundry git ref (branch, tag, or "latest")'
+        required: false
+        default: 'master'
+  schedule:
+    - cron: '0 3 * * 0'  # weekly Sunday 03:00 UTC
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            artifact: foundry-musl-linux-amd64
+          - target: aarch64-unknown-linux-musl
+            artifact: foundry-musl-linux-arm64
+
+    steps:
+      - name: Install Rust toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+          source $HOME/.cargo/env
+          rustup target add ${{ matrix.target }}
+
+      - name: Install cargo-zigbuild + Zig (fast musl cross-compilation)
+        run: |
+          source $HOME/.cargo/env
+          cargo install cargo-zigbuild
+          pip3 install ziglang --quiet
+
+      - name: Resolve Foundry ref
+        id: ref
+        run: |
+          REF="${{ github.event.inputs.foundry_ref || 'master' }}"
+          if [ "$REF" = "latest" ]; then
+            REF=$(curl -s https://api.github.com/repos/foundry-rs/foundry/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          fi
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "Building Foundry ref: $REF"
+
+      - name: Clone Foundry
+        run: |
+          git clone --depth 1 --branch ${{ steps.ref.outputs.ref }} \
+            https://github.com/foundry-rs/foundry.git /tmp/foundry || \
+          git clone --depth 1 https://github.com/foundry-rs/foundry.git /tmp/foundry
+
+      - name: Build with cargo-zigbuild
+        working-directory: /tmp/foundry
+        run: |
+          source $HOME/.cargo/env
+          cargo zigbuild \
+            --target ${{ matrix.target }} \
+            --release \
+            --bin forge \
+            --bin cast \
+            --bin anvil \
+            --bin chisel
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Package binaries
+        run: |
+          BINS="/tmp/foundry/target/${{ matrix.target }}/release"
+          mkdir -p /tmp/dist
+          cp "$BINS/forge" "$BINS/cast" "$BINS/anvil" "$BINS/chisel" /tmp/dist/
+          tar -czf ${{ matrix.artifact }}.tar.gz -C /tmp/dist forge cast anvil chisel
+          echo "Archive size: $(du -sh ${{ matrix.artifact }}.tar.gz | cut -f1)"
+          # Quick sanity: check it's an ELF binary
+          file /tmp/dist/anvil
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.tar.gz
+          retention-days: 7
+
+  release:
+    name: Publish musl release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh *.tar.gz
+
+      - name: Create / update foundry-musl-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: foundry-musl-latest
+          name: 'Foundry musl binaries (Alpine / Termux / Android)'
+          prerelease: true
+          body: |
+            Statically-linked Foundry binaries for musl libc environments.
+
+            **Supports:**
+            - Alpine Linux (Docker, UserLand, VMs)
+            - Termux on Android
+            - Any Linux with musl libc
+
+            **Usage:** ethsmith's postinstall automatically uses these when a musl environment is detected.
+
+            Built from: foundry-rs/foundry @ ${{ github.event.inputs.foundry_ref || 'master' }}
+          files: '*.tar.gz'

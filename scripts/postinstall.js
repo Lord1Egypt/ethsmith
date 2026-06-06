@@ -13,6 +13,7 @@ const { spawnSync } = require('child_process')
 const BIN_DIR = path.join(os.homedir(), '.ethsmith', 'bin')
 const TOOLS = ['forge', 'cast', 'anvil', 'chisel']
 const GITHUB_API = 'https://api.github.com/repos/foundry-rs/foundry/releases/latest'
+const MUSL_RELEASE_BASE = 'https://github.com/Lord1Egypt/ethsmith/releases/download/foundry-musl-latest'
 
 function getPlatform() {
   const arch = os.arch() === 'arm64' ? 'arm64' : 'amd64'
@@ -20,6 +21,18 @@ function getPlatform() {
   if (sys === 'darwin') return `darwin_${arch}`
   if (sys === 'linux')  return `linux_${arch}`
   if (sys === 'win32')  return `win32_amd64`
+  return null
+}
+
+function detectMusl() {
+  if (process.env.TERMUX_VERSION || (process.env.PREFIX || '').includes('com.termux')) return 'termux'
+  if (process.env.ANDROID_ROOT) return 'android'
+  if (fs.existsSync('/lib/ld-musl-x86_64.so.1') || fs.existsSync('/lib/ld-musl-aarch64.so.1')) return 'musl'
+  try {
+    const r = spawnSync('ldd', ['--version'], { stdio: 'pipe' })
+    const out = (r.stdout || r.stderr || Buffer.alloc(0)).toString()
+    if (out.toLowerCase().includes('musl')) return 'musl'
+  } catch {}
   return null
 }
 
@@ -35,11 +48,24 @@ function managedBinExists() {
   return fs.existsSync(path.join(BIN_DIR, 'anvil' + ext))
 }
 
+async function extractArchive(file, dest) {
+  if (file.endsWith('.zip')) {
+    let unzipper
+    try { unzipper = require('unzipper') } catch {
+      throw new Error('unzipper package not available — run: npm install -g unzipper')
+    }
+    await fs.createReadStream(file).pipe(unzipper.Extract({ path: dest })).promise()
+  } else {
+    const tar = require('tar')
+    await tar.extract({ file, cwd: dest, strip: 0 })
+  }
+}
+
 async function download() {
-  let axios, tar
-  try { axios = require('axios'); tar = require('tar') }
+  let axios
+  try { axios = require('axios') }
   catch {
-    console.warn('ethsmith: axios/tar unavailable — skipping Foundry download.')
+    console.warn('ethsmith: axios unavailable — skipping Foundry download.')
     console.warn('  Run "ethsmith install" to install manually.')
     return false
   }
@@ -51,15 +77,31 @@ async function download() {
     return false
   }
 
-  // Resolve latest Foundry release from GitHub API
+  const muslEnv = detectMusl()
+
+  // musl/Termux/Android: try our pre-built musl binaries first
+  if (muslEnv) {
+    const arch = os.arch() === 'arm64' ? 'arm64' : 'amd64'
+    const muslArtifact = `foundry-musl-linux-${arch}.tar.gz`
+    const muslUrl = `${MUSL_RELEASE_BASE}/${muslArtifact}`
+    console.log(`ethsmith: detected ${muslEnv} environment — trying musl binaries...`)
+    const ok = await tryDownload(axios, muslUrl, platform, 'musl')
+    if (ok) return true
+    console.warn('ethsmith: musl binaries not yet built for this release.')
+    console.warn('  For Termux/Alpine: use proot-distro with Ubuntu, then install ethsmith.')
+    console.warn('  Or build musl binaries: github.com/Lord1Egypt/ethsmith/actions/workflows/build-musl.yml')
+    return false
+  }
+
+  // Standard: resolve latest release from GitHub API
   let downloadUrl
   try {
     const res = await axios.get(GITHUB_API, {
       headers: { 'User-Agent': 'ethsmith-postinstall' },
       timeout: 30000
     })
-    const ext = platform.startsWith('win32') ? '.zip' : '.tar.gz'
-    const asset = res.data.assets.find(a => a.name.includes(platform) && a.name.endsWith(ext))
+    const fileExt = platform.startsWith('win32') ? '.zip' : '.tar.gz'
+    const asset = res.data.assets.find(a => a.name.includes(platform) && a.name.endsWith(fileExt))
     if (!asset) throw new Error(`No asset for platform: ${platform}`)
     downloadUrl = asset.browser_download_url
   } catch (e) {
@@ -68,14 +110,17 @@ async function download() {
     return false
   }
 
-  fs.mkdirSync(BIN_DIR, { recursive: true })
-  const ext = downloadUrl.endsWith('.zip') ? '.zip' : '.tar.gz'
+  return tryDownload(axios, downloadUrl, platform, 'standard')
+}
+
+async function tryDownload(axios, url, platform, label) {
+  const ext = url.endsWith('.zip') ? '.zip' : '.tar.gz'
   const tmpFile = path.join(os.tmpdir(), `foundry_ethsmith${ext}`)
 
-  process.stdout.write(`ethsmith: downloading Foundry for ${platform}... `)
+  process.stdout.write(`ethsmith: downloading Foundry [${label}] for ${platform}... `)
 
   try {
-    const res = await axios({ url: downloadUrl, method: 'GET', responseType: 'stream', timeout: 180000 })
+    const res = await axios({ url, method: 'GET', responseType: 'stream', timeout: 180000 })
     const writer = fs.createWriteStream(tmpFile)
     await new Promise((resolve, reject) => {
       res.data.pipe(writer)
@@ -86,12 +131,12 @@ async function download() {
   } catch (e) {
     process.stdout.write('failed\n')
     console.warn(`ethsmith: download failed: ${e.message}`)
-    console.warn('  Run "ethsmith install" to retry, or: https://getfoundry.sh')
     return false
   }
 
   try {
-    await tar.extract({ file: tmpFile, cwd: BIN_DIR, strip: 0 })
+    fs.mkdirSync(BIN_DIR, { recursive: true })
+    await extractArchive(tmpFile, BIN_DIR)
     fs.unlinkSync(tmpFile)
     for (const tool of TOOLS) {
       const p = path.join(BIN_DIR, tool + (os.platform() === 'win32' ? '.exe' : ''))

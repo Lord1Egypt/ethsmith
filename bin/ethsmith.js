@@ -10,6 +10,12 @@ if (major < 20) {
 }
 
 const { buildCLI } = require('../src/cli/index')
+const { showUpdateNotice, refreshUpdateCache } = require('../src/core/updater')
+
+// Show cached update notice (sync, zero latency), refresh cache in background
+showUpdateNotice()
+refreshUpdateCache()
+
 const program = buildCLI()
 program.parseAsync(process.argv).catch(err => {
   console.error(err.message)

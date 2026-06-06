@@ -92,7 +92,8 @@ async function downloadFoundry() {
   logger.info('Downloading Foundry binaries...', { url, platform })
 
   fs.mkdirSync(BIN_DIR, { recursive: true })
-  const tmpFile = path.join(os.tmpdir(), `foundry${ext}`)
+  const archiveExt = fileExt
+  const tmpFile = path.join(os.tmpdir(), `foundry${archiveExt}`)
   const writer = fs.createWriteStream(tmpFile)
 
   const response = await axios({ url, method: 'GET', responseType: 'stream', timeout: 180000 })
@@ -103,7 +104,12 @@ async function downloadFoundry() {
   })
 
   logger.info('Extracting Foundry binaries...')
-  await tar.extract({ file: tmpFile, cwd: BIN_DIR, strip: 0 })
+  if (tmpFile.endsWith('.zip')) {
+    const unzipper = require('unzipper')
+    await fs.createReadStream(tmpFile).pipe(unzipper.Extract({ path: BIN_DIR })).promise()
+  } else {
+    await tar.extract({ file: tmpFile, cwd: BIN_DIR, strip: 0 })
+  }
   fs.unlinkSync(tmpFile)
 
   for (const tool of TOOLS) {
