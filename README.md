@@ -10,6 +10,54 @@
 
 ---
 
+## Demo
+
+```
+$ ethsmith --deterministic
+
+⚡ ethsmith v1.3.3
+
+Available Accounts
+==================
+(0) 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (1000 ETH)
+(1) 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 (1000 ETH)
+...
+
+Chain ID: 1337  |  Port: 8545  |  Hardfork: cancun
+
+2026-06-06 [info] RPC proxy ready {"port":8545}
+2026-06-06 [info] No previous state — starting fresh chain
+
+# 30 seconds later — auto-checkpoint:
+2026-06-06 [info] Checkpoint saved {"block":4,"compressed":"8 KB"}
+
+# Ctrl+C — graceful shutdown:
+2026-06-06 [info] State saved. Restore on next run from block 4.
+```
+
+```
+$ ethsmith node --fork.network mainnet --block-time 12
+
+2026-06-06 [info] Forking mainnet at block 22009000
+2026-06-06 [info] RPC proxy ready {"port":8545}
+```
+
+```
+$ geth attach http://127.0.0.1:8545
+Welcome to the Geth JavaScript console!
+
+instance: anvil/v1.7.1
+at block: 0
+modules: eth:1.0 net:1.0 personal:1.0 web3:1.0
+
+> eth.accounts
+["0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266", ...]
+> eth.blockNumber
+0
+```
+
+---
+
 ## Why ethsmith?
 
 | Problem | Solution |
@@ -29,14 +77,30 @@
 npm install -g ethsmith
 ```
 
-On first run, ethsmith auto-detects your system Foundry installation.  
-If Foundry is not installed, run:
+> Requires **Node.js >= 20**.
 
-```bash
-ethsmith install
+**Foundry binary discovery — what happens automatically:**
+
+```
+npm install -g ethsmith
+    └─ postinstall runs
+       └─ downloads Foundry (forge, cast, anvil, chisel) → ~/.ethsmith/bin/
+
+ethsmith node
+    └─ looks for anvil in this order:
+       1. ~/.ethsmith/bin/anvil   ← managed copy (installed by postinstall)
+       2. System PATH             ← your existing Foundry install
+       3. Downloads on-demand    ← fallback if neither found
 ```
 
-> Requires **Node.js >= 20**. Foundry 1.6+ recommended.
+If postinstall was skipped (corporate proxy, offline, `SKIP_ETHSMITH_POSTINSTALL=1`) or you want to upgrade Foundry:
+
+```bash
+ethsmith install          # download / re-download Foundry to ~/.ethsmith/bin/
+ethsmith update           # update Foundry to latest version
+ethsmith update --check   # check versions without installing
+ethsmith doctor           # verify Node version, all 4 binaries, paths, DB
+```
 
 ---
 
@@ -171,7 +235,8 @@ ethsmith snapshot                   # gas snapshot (forge snapshot)
 
 ---
 
-### Cast Commands (On-chain Interaction)
+<details>
+<summary><b>Cast Commands (On-chain Interaction) — click to expand</b></summary>
 
 ```bash
 # Read calls
@@ -219,6 +284,8 @@ ethsmith from-utf8 "hello"
 ethsmith estimate 0xAddr "foo()"     # gas estimate
 ethsmith rpc eth_blockNumber         # raw JSON-RPC
 ```
+
+</details>
 
 ---
 
@@ -303,7 +370,8 @@ curl -X POST http://localhost:8545 -d '{"jsonrpc":"2.0","method":"anvil_reset","
 
 ---
 
-## Anvil Special RPC Methods
+<details>
+<summary><b>Anvil Special RPC Methods (32 methods) — click to expand</b></summary>
 
 All 32 Anvil special methods work out of the box:
 
@@ -349,9 +417,12 @@ cast rpc anvil_nodeInfo
 cast rpc anvil_metadata
 ```
 
+</details>
+
 ---
 
-## Ganache Compatibility Methods (personal_*, miner_*)
+<details>
+<summary><b>Ganache Compatibility Methods (personal_*, miner_*, EIP-712) — click to expand</b></summary>
 
 ```bash
 # Personal namespace (MetaMask compatibility)
@@ -370,9 +441,12 @@ cast rpc miner_setGasPrice '["0x3B9ACA00"]'
 cast rpc eth_signTypedData_v4 '["0xAddr",{"types":{...},"domain":{...},"message":{...}}]'
 ```
 
+</details>
+
 ---
 
-## Debug & Trace (Full EVM Tracing)
+<details>
+<summary><b>Debug & Trace (Full EVM Tracing) — click to expand</b></summary>
 
 ```bash
 # Step-by-step EVM trace
@@ -391,6 +465,8 @@ cast rpc txpool_content
 cast rpc txpool_inspect
 cast rpc txpool_status
 ```
+
+</details>
 
 ---
 
@@ -811,7 +887,8 @@ volumes:
 
 ---
 
-## CI/CD Pipeline
+<details>
+<summary><b>CI/CD Pipeline — click to expand</b></summary>
 
 ethsmith uses a fully automated CI/CD pipeline:
 
@@ -845,9 +922,12 @@ Go to `Settings → Secrets → Actions` and add:
 | `DOCKER_USERNAME` | `lord1egypt` |
 | `DOCKER_PASSWORD` | Docker Hub password or access token |
 
+</details>
+
 ---
 
-## Architecture
+<details>
+<summary><b>Architecture — click to expand</b></summary>
 
 ```
 ethsmith/
@@ -875,6 +955,131 @@ startup → LevelDB has state? → anvil_loadState RPC → Anvil restores state
 running → every 30s → anvil_dumpState RPC → gzip → LevelDB
 shutdown → anvil_dumpState RPC → gzip → LevelDB → kill Anvil
 ```
+
+</details>
+
+---
+
+## Troubleshooting / FAQ
+
+<details>
+<summary><b>Docker: container exits immediately with "unknown option '--host'"</b></summary>
+
+This was a bug in images older than v1.3.3. The `CMD` incorrectly passed `--host` which doesn't exist.
+
+**Fix:** pull the latest image.
+```bash
+docker pull lord1egypt/ethsmith:latest
+```
+</details>
+
+<details>
+<summary><b>Docker: state not persisting between container restarts</b></summary>
+
+You need a volume mount. Without `-v`, every `docker run` starts a fresh chain.
+
+```bash
+# Named volume (recommended)
+docker run -p 8545:8545 -v ethsmith-data:/root/.ethsmith/db lord1egypt/ethsmith:latest
+
+# Bind-mount to local folder
+docker run -p 8545:8545 -v ./data:/root/.ethsmith/db lord1egypt/ethsmith:latest
+```
+
+**Wrong path** — mounting to `/root/.ethsmith` instead of `/root/.ethsmith/db` shadows the Foundry binaries inside the image. Always use `/root/.ethsmith/db`.
+</details>
+
+<details>
+<summary><b>Docker: "exec: anvil: not found" or Foundry binaries missing</b></summary>
+
+Foundry is installed by `postinstall.js` when the image is built. This can fail if:
+- The image was pulled but not re-built after a base change
+- The volume is mounted to `/root/.ethsmith` (shadows binaries)
+
+```bash
+# Always mount to /root/.ethsmith/db — not the parent
+docker run -p 8545:8545 -v ethsmith-data:/root/.ethsmith/db lord1egypt/ethsmith:latest
+```
+</details>
+
+<details>
+<summary><b>geth attach: "Method not found" for net_peerCount</b></summary>
+
+This was fixed in v1.3.3. The proxy now returns `"0x0"` for `net_peerCount`.
+
+```bash
+npm install -g ethsmith   # upgrades to latest
+# or
+docker pull lord1egypt/ethsmith:latest
+```
+</details>
+
+<details>
+<summary><b>Port 8545 already in use</b></summary>
+
+```bash
+# Use a different port
+ethsmith --port 8546
+docker run -p 8546:8545 lord1egypt/ethsmith:latest node --port 8545
+```
+</details>
+
+<details>
+<summary><b>Foundry not found / "anvil: command not found"</b></summary>
+
+```bash
+ethsmith install    # downloads Foundry to ~/.ethsmith/bin/
+ethsmith doctor     # verify all binaries and paths
+```
+
+If you're on Alpine Linux or Termux (Android), see the [musl/Termux limitation in AUDIT.md](./AUDIT.md).
+</details>
+
+<details>
+<summary><b>State not restoring on restart</b></summary>
+
+ethsmith restores state automatically if the `--db` path is the same between runs. Default is `~/.ethsmith/db/<chainId>/`.
+
+```bash
+# Explicit path — safest for scripts
+ethsmith --db ./mychain --chain-id 1337
+
+# Make sure chain ID matches — state is keyed by chain ID
+ethsmith --chain-id 1337 --db ./mychain    # start
+ethsmith --chain-id 1337 --db ./mychain    # restart — restores correctly
+ethsmith --chain-id 9999 --db ./mychain    # WRONG chain ID — starts fresh
+```
+</details>
+
+<details>
+<summary><b>--log-file option ignored</b></summary>
+
+Fixed in v1.3.2. If you're on an older version:
+```bash
+npm install -g ethsmith   # upgrade to latest
+```
+</details>
+
+<details>
+<summary><b>~/.foundry/anvil/tmp/ growing to 50 GB+</b></summary>
+
+Fixed in v1.3.1. ethsmith now cleans Anvil's internal tmp dirs on startup and shutdown.
+
+To clean manually:
+```bash
+ethsmith clean          # remove leftover dirs
+ethsmith clean --dry-run  # preview what would be deleted
+```
+</details>
+
+---
+
+## Support
+
+- **Bug reports & feature requests:** [GitHub Issues](https://github.com/Lord1Egypt/ethsmith/issues)
+- **Full bug history & root causes:** [AUDIT.md](./AUDIT.md)
+- **All curl RPC examples:** [RPC_EXAMPLES.md](./RPC_EXAMPLES.md)
+- **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
@@ -927,6 +1132,10 @@ MIT — [Lord1Egypt](https://github.com/Lord1Egypt)
 
 ## Related Projects
 
-- [skillforge-agent](https://www.npmjs.com/package/skillforge-agent) — 539 AI agent skills (Claude, Gemini, Scientific)
-- [awesome-prompt-forge](https://www.npmjs.com/package/awesome-prompt-forge) — 2,592 AI system prompts
-- [awesome-ai-system-prompts](https://github.com/Lord1Egypt/awesome-ai-system-prompts) — Curated AI system prompts collection
+Other open-source projects by the same author ([Lord1Egypt](https://github.com/Lord1Egypt)):
+
+| Project | Description |
+|---------|-------------|
+| [skillforge-agent](https://www.npmjs.com/package/skillforge-agent) | 539 ready-to-use AI agent skills for Claude, Gemini, GPT — npm + PyPI |
+| [awesome-prompt-forge](https://www.npmjs.com/package/awesome-prompt-forge) | 2,592 curated AI system prompts across 14 categories — npm + PyPI |
+| [awesome-ai-system-prompts](https://github.com/Lord1Egypt/awesome-ai-system-prompts) | GitHub collection of AI system prompts for developers |
