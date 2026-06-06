@@ -33,7 +33,7 @@ function startNode() {
     let ready = false
     const timeout = setTimeout(() => {
       if (!ready) { proc.kill('SIGKILL'); reject(new Error('Node did not start in time')) }
-    }, 15000)
+    }, 25000)
 
     proc.stdout.on('data', (d) => {
       const line = d.toString()

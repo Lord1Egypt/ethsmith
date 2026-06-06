@@ -8,7 +8,7 @@ services:
     ports:
       - "8545:8545"
     volumes:
-      - ./data/dev:/root/.ethsmith
+      - ./data/dev:/root/.ethsmith/db
     command: ["node", "--host", "0.0.0.0", "--deterministic", "--chain-id", "1337", "--accounts", "10"]
     restart: unless-stopped
     environment:
@@ -21,7 +21,7 @@ services:
     ports:
       - "8546:8545"
     volumes:
-      - ./data/fork-mainnet:/root/.ethsmith
+      - ./data/fork-mainnet:/root/.ethsmith/db
     command: ["node", "--host", "0.0.0.0", "--fork.network", "mainnet", "--chain-id", "1"]
     restart: unless-stopped
     environment:
@@ -36,7 +36,7 @@ services:
     ports:
       - "8547:8545"
     volumes:
-      - ./data/fork-sepolia:/root/.ethsmith
+      - ./data/fork-sepolia:/root/.ethsmith/db
     command: ["node", "--host", "0.0.0.0", "--fork.network", "sepolia", "--chain-id", "11155111"]
     restart: unless-stopped
     environment:

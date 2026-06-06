@@ -237,6 +237,83 @@ function buildCLI() {
       console.log()
     })
 
+  // ── TAIL (application log) ────────────────────────────────────────────────
+  program
+    .command('tail')
+    .description('Tail the ethsmith application log file')
+    .option('-n, --lines <n>', 'number of lines to show', '50')
+    .option('-f, --follow', 'follow log output (like tail -f)')
+    .action((opts) => {
+      const fs = require('fs')
+      const path = require('path')
+      const os = require('os')
+      const { spawn } = require('child_process')
+
+      const logDir = path.join(os.homedir(), '.ethsmith', 'logs')
+      if (!fs.existsSync(logDir)) {
+        console.error('No log directory found. Start a node first.')
+        process.exit(1)
+      }
+      // Find today's log file
+      const today = new Date().toISOString().slice(0, 10)
+      const logFile = path.join(logDir, `ethsmith-${today}.log`)
+      if (!fs.existsSync(logFile)) {
+        // fall back to most recent log
+        const files = fs.readdirSync(logDir).filter(f => f.endsWith('.log')).sort()
+        if (!files.length) { console.error('No log files found.'); process.exit(1) }
+        const recent = path.join(logDir, files[files.length - 1])
+        console.log(`(showing ${files[files.length - 1]})\n`)
+        const args = opts.follow ? ['-n', opts.lines, '-f', recent] : ['-n', opts.lines, recent]
+        const p = spawn('tail', args, { stdio: 'inherit' })
+        p.on('exit', code => process.exit(code || 0))
+        return
+      }
+      console.log(`(showing ethsmith-${today}.log)\n`)
+      const args = opts.follow ? ['-n', opts.lines, '-f', logFile] : ['-n', opts.lines, logFile]
+      const p = spawn('tail', args, { stdio: 'inherit' })
+      p.on('exit', code => process.exit(code || 0))
+    })
+
+  // ── CONFIG ─────────────────────────────────────────────────────────────────
+  program
+    .command('config')
+    .description('Show or edit the ethsmith config file (~/.ethsmith/config.json)')
+    .option('--set <key=value>', 'set a config value (e.g. --set port=9545)')
+    .option('--reset', 'reset config to defaults')
+    .action((opts) => {
+      const fs = require('fs')
+      const { CONFIG_PATH, writeDefaultConfig } = require('../core/config')
+
+      if (opts.reset) {
+        if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH)
+        writeDefaultConfig()
+        console.log(`Config reset to defaults: ${CONFIG_PATH}`)
+        return
+      }
+
+      if (opts.set) {
+        const eq = opts.set.indexOf('=')
+        if (eq === -1) { console.error('Usage: ethsmith config --set key=value'); process.exit(1) }
+        const key = opts.set.slice(0, eq)
+        const rawVal = opts.set.slice(eq + 1)
+        const val = rawVal === 'true' ? true : rawVal === 'false' ? false : isNaN(rawVal) ? rawVal : Number(rawVal)
+        let current = {}
+        if (fs.existsSync(CONFIG_PATH)) current = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
+        current[key] = val
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(current, null, 2))
+        console.log(`Set ${key} = ${JSON.stringify(val)} in ${CONFIG_PATH}`)
+        return
+      }
+
+      // Just show current config
+      writeDefaultConfig()  // ensure it exists
+      const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'))
+      console.log(`\nConfig file: ${CONFIG_PATH}\n`)
+      console.log(JSON.stringify(config, null, 2))
+      console.log('\nTo change a value: ethsmith config --set port=9545')
+      console.log('To reset defaults:  ethsmith config --reset\n')
+    })
+
   // ── UPDATE ────────────────────────────────────────────────────────────────
   program
     .command('update')

@@ -51,18 +51,22 @@ function mapGanacheToAnvil(opts) {
   }
 
   // fork network shorthand (Ganache: --fork.network mainnet)
+  // env var ETHSMITH_FORK_<NETWORK>_URL overrides the public default RPC
   const forkNetwork = opts['fork.network'] || opts.forkNetwork
   if (forkNetwork && !anvil.includes('--fork-url')) {
-    const networkUrls = {
-      mainnet: 'https://eth.llamarpc.com',
-      sepolia: 'https://rpc.sepolia.org',
+    const defaultUrls = {
+      mainnet:  'https://eth.llamarpc.com',
+      sepolia:  'https://rpc.sepolia.org',
       arbitrum: 'https://arb1.arbitrum.io/rpc',
       optimism: 'https://mainnet.optimism.io',
-      base: 'https://mainnet.base.org',
-      polygon: 'https://polygon-rpc.com'
+      base:     'https://mainnet.base.org',
+      polygon:  'https://polygon-rpc.com'
     }
-    const url = networkUrls[forkNetwork.toLowerCase()]
-    if (!url) throw new Error(`Unknown network: ${forkNetwork}. Use: mainnet, sepolia, arbitrum, optimism, base, polygon`)
+    const name = forkNetwork.toLowerCase()
+    if (!defaultUrls[name]) throw new Error(`Unknown network: ${forkNetwork}. Use: mainnet, sepolia, arbitrum, optimism, base, polygon`)
+    // ETHSMITH_FORK_MAINNET_URL, ETHSMITH_FORK_SEPOLIA_URL, etc.
+    const envKey = `ETHSMITH_FORK_${name.toUpperCase()}_URL`
+    const url = process.env[envKey] || defaultUrls[name]
     anvil.push('--fork-url', url)
   }
 

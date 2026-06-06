@@ -1,0 +1,77 @@
+# Changelog
+
+All notable changes to ethsmith are documented here.
+
+## [1.3.0] — 2026-06-06
+
+### Added
+- `ethsmith logs` — tail today's log file, with `-f` follow mode and `-n` line count
+- `ethsmith config` — view, set, or reset the `~/.ethsmith/config.json` config file
+- `ETHSMITH_FORK_<NETWORK>_URL` env vars — override the default public RPC URL per network
+  - `ETHSMITH_FORK_MAINNET_URL`, `ETHSMITH_FORK_SEPOLIA_URL`, `ETHSMITH_FORK_ARBITRUM_URL`, etc.
+
+### Fixed
+- `docker-compose.yml` volume paths corrected from `:/root/.ethsmith` to `:/root/.ethsmith/db`
+  — the previous path would shadow Foundry binaries installed by postinstall, breaking the container
+- LevelDB state snapshots now pruned to keep only the 5 most recent — prevents unbounded disk growth
+- Request body size capped at 10 MB in proxy to prevent memory exhaustion on malformed requests
+- `publish.yml` now runs all 6 test suites (was only 3) and uses the correct Foundry cache key
+
+### Changed
+- Docker publish workflow now builds multi-platform images (linux/amd64 + linux/arm64)
+
+---
+
+## [1.2.0] — 2026-06-06
+
+### Added
+- `ethsmith update` — update Foundry binaries to the latest version
+- `ethsmith update --check` — check for updates without installing (shows Foundry + ethsmith versions)
+- Auto-update notification — background npm check cached for 24h, shown on next startup
+- ARM64 CI: `ubuntu-24.04-arm` added to test matrix alongside `ubuntu-latest`
+- `build-musl.yml` — GitHub Actions workflow to cross-compile Foundry for musl targets (Alpine/Termux)
+- musl/Termux/Android detection in postinstall — tries musl-specific binaries, falls back gracefully
+
+### Fixed
+- Windows `.zip` extraction: replaced `tar` with `unzipper` for `.zip` archives on Windows
+
+---
+
+## [1.1.0] — 2026-06-06
+
+### Added
+- `scripts/postinstall.js` — auto-downloads Foundry at `npm install` time (like Puppeteer/esbuild)
+  - Skips if `anvil` found in system PATH
+  - Skips if managed `~/.ethsmith/bin/anvil` already exists
+  - `SKIP_ETHSMITH_POSTINSTALL=1` env var to opt out
+  - Uses GitHub Releases API to resolve the correct versioned asset URL
+- `ethsmith doctor` — checks Node version, all 4 Foundry tools with versions and paths, DB/bin dirs
+
+### Fixed
+- Foundry download URL: switched from hardcoded `foundry_stable_*` to dynamic GitHub API resolution
+  — Foundry renamed their release assets to versioned names (e.g. `foundry_v1.7.1_linux_amd64.tar.gz`)
+- `anvil_mine N blocks` test assertion: Anvil 1.7.1 mines the pending block first, producing N+1 blocks
+
+### Changed
+- `binary.js` lookup priority: managed `~/.ethsmith/bin/` → system PATH → runtime download
+- Dockerfile: removed `foundryup` install layer; `npm ci` now triggers postinstall download
+- `VOLUME` narrowed from `/root/.ethsmith` to `/root/.ethsmith/db` so binaries stay in image layer
+- CI: replaced `foundry-rs/foundry-toolchain@v1` with `actions/cache` + postinstall
+
+---
+
+## [1.0.0] — 2026-06-05
+
+### Initial release
+
+- Unified Ethereum dev toolkit wrapping all 4 Foundry tools (Forge + Cast + Anvil + Chisel)
+- Full Ganache CLI compatibility: `--accounts`, `--mnemonic`, `--deterministic`, `--chain-id`, `--fork`, `--unlock`, etc.
+- Ganache RPC API: `personal_*`, `miner_*`, `eth_sign`, `eth_signTypedData_v4`
+- Full Anvil RPC API: `anvil_setBalance`, `anvil_impersonateAccount`, `evm_snapshot`, `evm_revert`, etc.
+- LevelDB state persistence: gzip-compressed checkpoints every 30s + on SIGTERM
+- Two-port architecture: Anvil on internal OS-assigned port, EthsmithProxy on user-facing port
+- WebSocket proxy on the same port as HTTP
+- Full Cancun hardfork EIP support: EIP-1153, EIP-5656, EIP-1559, EIP-3855, EIP-2929, EIP-4844
+- Docker image: `lord1egypt/ethsmith`
+- CI: Node 20 + 22 matrix, 6 test suites
+- Programmatic API: `ethsmith.provider()`, `ethsmith.server()` (EIP-1193 compatible)

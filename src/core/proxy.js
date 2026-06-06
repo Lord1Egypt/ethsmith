@@ -109,7 +109,18 @@ class EthsmithProxy {
       if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return }
 
       let body = ''
-      req.on('data', c => { body += c })
+      let bodySize = 0
+      const MAX_BODY = 10 * 1024 * 1024  // 10 MB
+      req.on('data', c => {
+        bodySize += c.length
+        if (bodySize > MAX_BODY) {
+          req.destroy()
+          res.writeHead(413, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Request too large' } }))
+          return
+        }
+        body += c
+      })
       req.on('end', async () => {
         try {
           const parsed = JSON.parse(body)

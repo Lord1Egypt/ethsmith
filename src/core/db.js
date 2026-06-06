@@ -38,7 +38,7 @@ class EthsmithDB {
     const buf = Buffer.from(raw, 'hex')
     const compressed = zlib.gzipSync(buf)
     const ts = Date.now()
-    await this.db.put(`state:latest`, compressed)
+    await this.db.put('state:latest', compressed)
     await this.db.put(`state:${ts}`, compressed)
     logger.info('State saved to LevelDB', {
       chainId: this.chainId,
@@ -46,6 +46,23 @@ class EthsmithDB {
       compressedBytes: compressed.length,
       ratio: (compressed.length / buf.length).toFixed(2)
     })
+    // Prune old snapshots — keep only the 5 most recent timestamped entries
+    await this._pruneStateSnapshots(5)
+  }
+
+  async _pruneStateSnapshots(keep = 5) {
+    const keys = []
+    for await (const key of this.db.keys({ gte: 'state:', lte: 'state:~' })) {
+      if (key !== 'state:latest') keys.push(key)
+    }
+    // keys are sorted ascending; delete all but the last `keep`
+    const toDelete = keys.slice(0, Math.max(0, keys.length - keep))
+    for (const key of toDelete) {
+      await this.db.del(key)
+    }
+    if (toDelete.length > 0) {
+      logger.debug('Pruned old state snapshots', { deleted: toDelete.length, kept: keep })
+    }
   }
 
   async loadState() {
