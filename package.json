@@ -1,0 +1,50 @@
+{
+  "name": "ethsmith",
+  "version": "1.0.0",
+  "description": "Unified Ethereum dev toolkit — Ganache-compatible API powered by Foundry (Forge + Cast + Anvil + Chisel) with LevelDB persistence",
+  "main": "src/index.js",
+  "bin": {
+    "ethsmith": "bin/ethsmith.js"
+  },
+  "scripts": {
+    "start": "node bin/ethsmith.js",
+    "test": "node test/basic.js"
+  },
+  "keywords": [
+    "ethereum",
+    "ganache",
+    "foundry",
+    "anvil",
+    "forge",
+    "cast",
+    "chisel",
+    "blockchain",
+    "solidity",
+    "evm",
+    "hardhat",
+    "web3",
+    "development"
+  ],
+  "author": "Lord1Egypt",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.0.0",
+    "level": "^8.0.0",
+    "axios": "^1.6.0",
+    "tar": "^7.0.0",
+    "ethers": "^6.0.0",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lord1Egypt/ethsmith.git"
+  },
+  "homepage": "https://github.com/Lord1Egypt/ethsmith#readme",
+  "bugs": {
+    "url": "https://github.com/Lord1Egypt/ethsmith/issues"
+  }
+}

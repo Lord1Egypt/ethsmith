@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Local dev node — deterministic accounts, instamine
+  node-dev:
+    image: lord1egypt/ethsmith:latest
+    container_name: ethsmith-dev
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./data/dev:/root/.ethsmith
+    command: ["node", "--host", "0.0.0.0", "--deterministic", "--chain-id", "1337", "--accounts", "10"]
+    restart: unless-stopped
+    environment:
+      - ETHSMITH_LOG_LEVEL=info
+
+  # Mainnet fork node
+  node-fork-mainnet:
+    image: lord1egypt/ethsmith:latest
+    container_name: ethsmith-fork-mainnet
+    ports:
+      - "8546:8545"
+    volumes:
+      - ./data/fork-mainnet:/root/.ethsmith
+    command: ["node", "--host", "0.0.0.0", "--fork.network", "mainnet", "--chain-id", "1"]
+    restart: unless-stopped
+    environment:
+      - ETHSMITH_LOG_LEVEL=info
+    profiles:
+      - fork
+
+  # Sepolia fork node
+  node-fork-sepolia:
+    image: lord1egypt/ethsmith:latest
+    container_name: ethsmith-fork-sepolia
+    ports:
+      - "8547:8545"
+    volumes:
+      - ./data/fork-sepolia:/root/.ethsmith
+    command: ["node", "--host", "0.0.0.0", "--fork.network", "sepolia", "--chain-id", "11155111"]
+    restart: unless-stopped
+    environment:
+      - ETHSMITH_LOG_LEVEL=info
+    profiles:
+      - fork
+
+volumes:
+  data:

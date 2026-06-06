@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Foundry
+        run: |
+          curl -L https://foundry.paradigm.xyz | bash
+          echo "$HOME/.foundry/bin" >> $GITHUB_PATH
+          $HOME/.foundry/bin/foundryup
+
+      - name: Run unit tests
+        run: node test/basic.js
+
+      - name: Run persistence test
+        run: node test/persistence.js
+
+      - name: Run highload test
+        run: node test/highload.js
+
+      - name: Run multi-instance test
+        run: node test/multi_instance.js
+
+      - name: Run Anvil features test
+        run: node test/anvil_features.js
+
+      - name: Run crash recovery test
+        run: node test/crash_recovery.js
