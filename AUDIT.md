@@ -5,6 +5,33 @@ Ordered by version. Use this to understand why specific decisions were made.
 
 ---
 
+## v1.3.3 — `net_peerCount` returned "Method not found"
+
+### Bug
+`geth attach http://127.0.0.1:8545` showed an error for the peer count field in its console banner, and any tool calling `net_peerCount` received a `-32601 Method not found` error.
+
+### Root Cause
+Anvil does not implement `net_peerCount` — it's a P2P networking method and Anvil is a local dev node with no P2P peers. The proxy forwarded the call to Anvil, which returned a "Method not found" error instead of a sensible value.
+
+### Fix
+One line in `proxy.js` `_dispatch()`, before the forward block:
+```js
+if (method === 'net_peerCount') return '0x0'  // local dev node, no peers
+```
+This is correct semantics — a local dev node always has 0 P2P peers. The result is a proper hex-encoded quantity (`"0x0"`) matching the `eth_` quantity encoding spec.
+
+### Impact
+With this fix all 5 methods `geth attach` calls on connection now work:
+| Method | Before | After |
+|--------|--------|-------|
+| `web3_clientVersion` | ✅ `"anvil/v1.6.0"` | ✅ |
+| `net_version` | ✅ `"1337"` | ✅ |
+| `net_listening` | ✅ `true` | ✅ |
+| `net_peerCount` | ❌ `-32601` | ✅ `"0x0"` |
+| `eth_blockNumber` | ✅ `"0x0"` | ✅ |
+
+---
+
 ## v1.3.2 — `--log-file` CLI option silently ignored
 
 ### Bug
@@ -267,4 +294,4 @@ Foundry releases only ship glibc-linked binaries. Termux uses Android's Bionic l
 
 ---
 
-*Last updated: 2026-06-06 — ethsmith v1.3.1*
+*Last updated: 2026-06-06 — ethsmith v1.3.3*

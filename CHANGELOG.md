@@ -2,6 +2,17 @@
 
 All notable changes to ethsmith are documented here.
 
+## [1.3.3] — 2026-06-06
+
+### Fixed
+- **`net_peerCount` returned "Method not found"** — Anvil doesn't implement this method.
+  Since ethsmith is a local dev node with no P2P peers, the proxy now returns `"0x0"` directly.
+  This was the only method `geth attach http://127.0.0.1:8545` required that wasn't working —
+  all other connection handshake calls (`web3_clientVersion`, `net_version`, `net_listening`,
+  `eth_blockNumber`) already worked. With this fix, `geth attach` connects cleanly.
+
+---
+
 ## [1.3.2] — 2026-06-06
 
 ### Fixed

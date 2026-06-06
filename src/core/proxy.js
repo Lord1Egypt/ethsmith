@@ -41,6 +41,9 @@ class EthsmithProxy {
   }
 
   async _dispatch(method, params) {
+    // ── net_* — fill gaps Anvil doesn't implement ───────────────────────────
+    if (method === 'net_peerCount') return '0x0'  // local dev node, no peers
+
     // ── miner_* → Anvil equivalents ─────────────────────────────────────────
     if (method === 'miner_start') {
       const r = await this.forward('evm_setAutomine', [true])
