@@ -19,11 +19,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Foundry (for tests)
-        run: |
-          curl -L https://foundry.paradigm.xyz | bash
-          echo "$HOME/.foundry/bin" >> $GITHUB_PATH
-          $HOME/.foundry/bin/foundryup
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
 
       - name: Run tests before publish
         run: node test/basic.js && node test/persistence.js && node test/highload.js
