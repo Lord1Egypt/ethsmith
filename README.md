@@ -4,7 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/ethsmith)](https://www.npmjs.com/package/ethsmith)
 [![CI](https://github.com/Lord1Egypt/ethsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/Lord1Egypt/ethsmith/actions/workflows/ci.yml)
-[![Docker](https://img.shields.io/docker/v/akim92/ethsmith?label=docker)](https://hub.docker.com/r/akim92/ethsmith)
+[![Docker](https://img.shields.io/docker/v/lord1egypt/ethsmith?label=docker)](https://hub.docker.com/r/lord1egypt/ethsmith)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -550,13 +550,13 @@ Each instance has its own LevelDB directory and process — completely independe
 
 ```bash
 # Run with Docker
-docker run -p 8545:8545 akim92/ethsmith
+docker run -p 8545:8545 lord1egypt/ethsmith
 
 # With persistent state
-docker run -p 8545:8545 -v $(pwd)/data:/root/.ethsmith akim92/ethsmith
+docker run -p 8545:8545 -v $(pwd)/data:/root/.ethsmith lord1egypt/ethsmith
 
 # Fork mainnet
-docker run -p 8545:8545 akim92/ethsmith ethsmith --fork.network mainnet
+docker run -p 8545:8545 lord1egypt/ethsmith ethsmith --fork.network mainnet
 
 # docker-compose for multi-instance
 ```
@@ -566,13 +566,13 @@ docker run -p 8545:8545 akim92/ethsmith ethsmith --fork.network mainnet
 version: '3.8'
 services:
   node-dev:
-    image: akim92/ethsmith
+    image: lord1egypt/ethsmith
     ports: ['8545:8545']
     volumes: ['./data/dev:/root/.ethsmith']
     command: ethsmith --deterministic --chain-id 1337
 
   node-fork:
-    image: akim92/ethsmith
+    image: lord1egypt/ethsmith
     ports: ['8546:8545']
     volumes: ['./data/fork:/root/.ethsmith']
     command: ethsmith --fork.network mainnet
@@ -611,7 +611,7 @@ Go to `Settings → Secrets → Actions` and add:
 | Secret | Value |
 |--------|-------|
 | `NPM_TOKEN` | npm access token (from npmjs.com → Account → Access Tokens) |
-| `DOCKER_USERNAME` | `akim92` |
+| `DOCKER_USERNAME` | `lord1egypt` |
 | `DOCKER_PASSWORD` | Docker Hub password or access token |
 
 ---
