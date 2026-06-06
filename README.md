@@ -817,6 +817,7 @@ services:
     volumes: ['./data/dev:/root/.ethsmith/db']
     command: node --deterministic --chain-id 1337
     restart: unless-stopped
+    stop_grace_period: 30s   # gives checkpoint time to finish before SIGKILL
 
   # Mainnet fork — 12s block time, persistent fork cache
   node-mainnet-fork:
@@ -827,6 +828,7 @@ services:
       - ETHSMITH_FORK_MAINNET_URL=https://eth.llamarpc.com
     command: node --fork.network mainnet --block-time 12 --chain-id 1
     restart: unless-stopped
+    stop_grace_period: 30s
 
   # Sepolia fork — for testnet simulation
   node-sepolia-fork:
@@ -835,15 +837,13 @@ services:
     volumes: ['./data/fork-sepolia:/root/.ethsmith/db']
     command: node --fork.network sepolia --deterministic
     restart: unless-stopped
+    stop_grace_period: 30s
 
   # Silent CI node — no auto-mining, errors only
   node-ci:
     image: lord1egypt/ethsmith:latest
     ports: ['8548:8545']
     command: node --deterministic --no-mining --log-level error
-
-volumes:
-  ethsmith-data:
 ```
 
 ### Available `docker run` Flags Reference

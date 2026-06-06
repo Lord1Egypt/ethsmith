@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Local dev node — deterministic accounts, instamine
+  # Local dev node — deterministic accounts, instamine, persistent state
   node-dev:
     image: lord1egypt/ethsmith:latest
     container_name: ethsmith-dev
@@ -9,8 +9,9 @@ services:
       - "8545:8545"
     volumes:
       - ./data/dev:/root/.ethsmith/db
-    command: ["node", "--host", "0.0.0.0", "--deterministic", "--chain-id", "1337", "--accounts", "10"]
+    command: ["node", "--deterministic", "--chain-id", "1337", "--accounts", "10"]
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       - ETHSMITH_LOG_LEVEL=info
 
@@ -22,8 +23,9 @@ services:
       - "8546:8545"
     volumes:
       - ./data/fork-mainnet:/root/.ethsmith/db
-    command: ["node", "--host", "0.0.0.0", "--fork.network", "mainnet", "--chain-id", "1"]
+    command: ["node", "--fork.network", "mainnet", "--chain-id", "1"]
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       - ETHSMITH_LOG_LEVEL=info
     profiles:
@@ -37,12 +39,10 @@ services:
       - "8547:8545"
     volumes:
       - ./data/fork-sepolia:/root/.ethsmith/db
-    command: ["node", "--host", "0.0.0.0", "--fork.network", "sepolia", "--chain-id", "11155111"]
+    command: ["node", "--fork.network", "sepolia", "--chain-id", "11155111"]
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       - ETHSMITH_LOG_LEVEL=info
     profiles:
       - fork
-
-volumes:
-  data:
