@@ -2,6 +2,22 @@
 
 All notable changes to ethsmith are documented here.
 
+## [1.3.2] — 2026-06-06
+
+### Fixed
+- **`--log-file <path>` option was silently ignored** — the CLI accepted the flag but `logger.js`
+  always wrote to `~/.ethsmith/logs/` regardless. Now honoured: when `--log-file` is set, logs
+  are written to the specified file using a plain `winston.transports.File` (no date-rotation suffix
+  appended). Parent directories are created automatically if they don't exist.
+
+### How it works
+The fix follows the same pattern as `--log-level` (which already worked via `ETHSMITH_LOG_LEVEL`):
+the command action sets `process.env.ETHSMITH_LOG_FILE = path.resolve(opts.logFile)` before any
+internal `require()` that pulls in `logger.js`. Since `logger.js` is a singleton initialised at
+first `require()` time, it reads the env var and configures the correct transport.
+
+---
+
 ## [1.3.1] — 2026-06-06
 
 ### Fixed

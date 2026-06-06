@@ -5,6 +5,32 @@ Ordered by version. Use this to understand why specific decisions were made.
 
 ---
 
+## v1.3.2 — `--log-file` CLI option silently ignored
+
+### Bug
+`ethsmith node --log-file /var/log/ethsmith.log` accepted the flag without error but always wrote logs to `~/.ethsmith/logs/ethsmith-<date>.log`, ignoring the specified path entirely.
+
+### Root Cause
+`logger.js` is a module-level singleton — it runs once at `require()` time and creates `DailyRotateFile` with a hardcoded `LOG_DIR`. The `--log-file` value from Commander was parsed into `opts.logFile` but was never read anywhere after that; there was no code path from the CLI option to the logger transport.
+
+### Fix
+Two-file change, no restructuring:
+
+**`src/cli/index.js`** — node command action sets the env var before any internal require:
+```js
+if (opts.logFile) process.env.ETHSMITH_LOG_FILE = require('path').resolve(opts.logFile)
+```
+This must happen before `require('../core/binary')` because that transitively requires `logger.js`.
+
+**`src/core/logger.js`** — reads `ETHSMITH_LOG_FILE` at init time:
+- If set → `winston.transports.File` pointing to that exact path (no date suffix, parent dirs auto-created)
+- If not set → `DailyRotateFile` with default `~/.ethsmith/logs/` (unchanged behaviour)
+
+### Why env var instead of a configure() function
+`logger.js` is required lazily (inside command action callbacks, not at module load). Setting an env var before the first require is the simplest mechanism that works, and is consistent with how `--log-level` / `ETHSMITH_LOG_LEVEL` already worked.
+
+---
+
 ## v1.3.1 — Anvil tmp disk accumulation (50 GB)
 
 ### Bug

@@ -45,6 +45,8 @@ function buildCLI() {
     .option('--keep-history', 'keep full per-block history in Anvil (uses more disk space)')
     .action(async (opts) => {
       process.env.ETHSMITH_LOG_LEVEL = opts.logLevel || 'info'
+      // Set before any require() that pulls in logger.js — it reads these at init time
+      if (opts.logFile) process.env.ETHSMITH_LOG_FILE = require('path').resolve(opts.logFile)
       const { ensureFoundry } = require('../core/binary')
       await ensureFoundry()
       const { runNode } = require('./node')
