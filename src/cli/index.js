@@ -42,6 +42,7 @@ function buildCLI() {
     .option('--order <type>', 'transaction ordering: fees or fifo')
     .option('--log-level <level>', 'log level: debug, info, warn, error', 'info')
     .option('--log-file <path>', 'custom log file path')
+    .option('--keep-history', 'keep full per-block history in Anvil (uses more disk space)')
     .action(async (opts) => {
       process.env.ETHSMITH_LOG_LEVEL = opts.logLevel || 'info'
       const { ensureFoundry } = require('../core/binary')
@@ -236,6 +237,67 @@ function buildCLI() {
       }
       console.log()
     })
+
+  // ── CLEAN ─────────────────────────────────────────────────────────────────
+  program
+    .command('clean')
+    .description('Remove Anvil tmp state dirs and old LevelDB snapshots to reclaim disk space')
+    .option('--dry-run', 'show what would be deleted without deleting')
+    .action(async (opts) => {
+      const os = require('os')
+      const path = require('path')
+      const fs = require('fs')
+
+      const anvilTmpDir = path.join(os.homedir(), '.foundry', 'anvil', 'tmp')
+      let totalFreed = 0
+
+      // 1. Anvil session tmp dirs
+      if (fs.existsSync(anvilTmpDir)) {
+        const dirs = fs.readdirSync(anvilTmpDir).map(n => path.join(anvilTmpDir, n))
+        if (dirs.length === 0) {
+          console.log('  Anvil tmp: nothing to clean')
+        } else {
+          for (const dir of dirs) {
+            try {
+              const size = getDirSize(dir)
+              totalFreed += size
+              console.log(`  ${opts.dryRun ? '[dry-run] would delete' : 'Deleting'} ${path.basename(dir)}  (${formatBytes(size)})`)
+              if (!opts.dryRun) fs.rmSync(dir, { recursive: true, force: true })
+            } catch {}
+          }
+        }
+      } else {
+        console.log('  Anvil tmp: directory does not exist (nothing to clean)')
+      }
+
+      // 2. ethsmith LevelDB — remove old timestamped state snapshots across all chains
+      const dbRoot = path.join(os.homedir(), '.ethsmith', 'db')
+      if (fs.existsSync(dbRoot)) {
+        // handled automatically by the 5-snapshot limit in db.js, just inform
+        console.log(`  LevelDB snapshots are auto-pruned to 5 per chain (no action needed)`)
+      }
+
+      console.log(`\n  ${opts.dryRun ? 'Would free' : 'Freed'}: ${formatBytes(totalFreed)}`)
+    })
+
+  function getDirSize(dirPath) {
+    let total = 0
+    try {
+      for (const entry of fs.readdirSync(dirPath)) {
+        const full = path.join(dirPath, entry)
+        const stat = fs.statSync(full)
+        total += stat.isDirectory() ? getDirSize(full) : stat.size
+      }
+    } catch {}
+    return total
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+  }
 
   // ── TAIL (application log) ────────────────────────────────────────────────
   program

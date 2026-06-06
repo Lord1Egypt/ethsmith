@@ -2,6 +2,26 @@
 
 All notable changes to ethsmith are documented here.
 
+## [1.3.1] — 2026-06-06
+
+### Fixed
+- **50GB disk growth problem** — Anvil creates `~/.foundry/anvil/tmp/anvil-state-<timestamp>/` on every
+  startup (its own disk-backed EVM state). Since ethsmith persists state to LevelDB, these directories
+  are fully redundant after each session. Now:
+  - **On startup**: all previous sessions' Anvil tmp dirs are deleted automatically
+  - **On shutdown**: after the final LevelDB checkpoint, the current session's tmp dir is deleted
+  - Net result: `~/.foundry/anvil/tmp/` stays empty — zero accumulation between sessions
+- **`--prune-history` enabled by default** — Anvil previously kept full per-block state history in its
+  tmp dir, causing each session's directory to grow with every mined block. With `--prune-history`
+  (now default), Anvil only stores current state, significantly reducing per-session dir size.
+  Use `--keep-history` to opt out if you need `eth_getLogs` across old blocks.
+
+### Added
+- `ethsmith clean [--dry-run]` — manually remove any leftover Anvil tmp dirs and see disk reclaimed
+- `--keep-history` flag on `ethsmith node` — opt out of `--prune-history` when historical queries matter
+
+---
+
 ## [1.3.0] — 2026-06-06
 
 ### Added

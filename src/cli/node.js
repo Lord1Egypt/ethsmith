@@ -1,6 +1,9 @@
 const { spawn } = require('child_process')
 const { EventEmitter } = require('events')
 const net = require('net')
+const path = require('path')
+const os = require('os')
+const fs = require('fs')
 const axios = require('axios')
 const { bin } = require('../core/binary')
 const { mapGanacheToAnvil } = require('../core/flags')
@@ -11,6 +14,8 @@ const { mergeConfig, writeDefaultConfig } = require('../core/config')
 const logger = require('../core/logger')
 
 const DEFAULT_CHECKPOINT_INTERVAL = 30000
+// Anvil writes per-session EVM state to this dir — redundant once ethsmith saves to LevelDB
+const ANVIL_TMP_DIR = path.join(os.homedir(), '.foundry', 'anvil', 'tmp')
 
 async function findFreePort() {
   return new Promise((resolve, reject) => {
@@ -37,6 +42,7 @@ class EthsmithNode extends EventEmitter {
     // kebab-case CLI opts take priority over camelCase config file defaults
     this.chainId = String(this.opts['chain-id'] || this.opts.chainId || this.opts.networkId || 1337)
     this.internalUrl = null
+    this._anvilSessionTmpDir = null  // the specific dir Anvil creates for this session
   }
 
   async start() {
@@ -61,6 +67,9 @@ class EthsmithNode extends EventEmitter {
       chainId: this.chainId
     })
 
+    // Snapshot existing Anvil tmp dirs so we can identify the new one after spawn
+    const tmpDirsBefore = this._listAnvilTmpDirs()
+
     // spawn Anvil on internal port
     this.proc = spawn(bin('anvil'), anvilArgs, {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -83,6 +92,13 @@ class EthsmithNode extends EventEmitter {
 
     // wait for internal Anvil RPC
     await this._waitReady(this.internalPort)
+
+    // Identify the new Anvil tmp dir for this session, then delete all old ones.
+    // Anvil creates ~/.foundry/anvil/tmp/anvil-state-<timestamp>/ on every start.
+    // These dirs are Anvil's internal disk-backed EVM state — redundant once ethsmith
+    // checkpoints to LevelDB. We clean old dirs now and this session's dir on shutdown.
+    this._anvilSessionTmpDir = this._findNewAnvilTmpDir(tmpDirsBefore)
+    this._cleanOldAnvilTmpDirs(tmpDirsBefore)
 
     // restore state from LevelDB if any
     const hasPrev = await this.db.hasState()
@@ -143,6 +159,8 @@ class EthsmithNode extends EventEmitter {
     await this.proxy?.stop()
     if (this.proc && !this.proc.killed) this.proc.kill('SIGTERM')
     await this.db?.close()
+    // State is safely in LevelDB — Anvil's session tmp dir is now redundant
+    this._cleanCurrentAnvilTmpDir()
     logger.info('ethsmith node stopped')
   }
 
@@ -196,6 +214,43 @@ class EthsmithNode extends EventEmitter {
     } catch (e) {
       logger.error('Checkpoint failed', { error: e.message })
     }
+  }
+
+  // ── Anvil tmp dir management ──────────────────────────────────────────────
+  // Anvil creates ~/.foundry/anvil/tmp/anvil-state-<timestamp>/ on every start.
+  // These mirror the EVM state on disk — ethsmith's LevelDB makes them redundant.
+
+  _listAnvilTmpDirs() {
+    try {
+      if (!fs.existsSync(ANVIL_TMP_DIR)) return []
+      return fs.readdirSync(ANVIL_TMP_DIR)
+        .map(name => path.join(ANVIL_TMP_DIR, name))
+        .filter(p => { try { return fs.statSync(p).isDirectory() } catch { return false } })
+    } catch { return [] }
+  }
+
+  _findNewAnvilTmpDir(before) {
+    const after = this._listAnvilTmpDirs()
+    const newDirs = after.filter(d => !before.includes(d))
+    return newDirs[0] || null
+  }
+
+  _cleanOldAnvilTmpDirs(before) {
+    // 'before' dirs are from previous sessions — LevelDB already has their state
+    for (const dir of before) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true })
+        logger.info('Cleaned old Anvil tmp dir', { dir: path.basename(dir) })
+      } catch {}
+    }
+  }
+
+  _cleanCurrentAnvilTmpDir() {
+    if (!this._anvilSessionTmpDir) return
+    try {
+      fs.rmSync(this._anvilSessionTmpDir, { recursive: true, force: true })
+      logger.info('Cleaned Anvil session tmp dir', { dir: path.basename(this._anvilSessionTmpDir) })
+    } catch {}
   }
 }
 

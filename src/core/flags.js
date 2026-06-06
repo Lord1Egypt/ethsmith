@@ -111,8 +111,10 @@ function mapGanacheToAnvil(opts) {
   // no mining
   if (opts.noMining || opts['no-mining']) anvil.push('--no-mining')
 
-  // prune history
-  if (opts.pruneHistory || opts['prune-history']) anvil.push('--prune-history')
+  // prune history — ON by default because ethsmith persists state to LevelDB.
+  // Keeping full per-block history in Anvil's tmp dir causes 50GB+ growth over time.
+  // Use --keep-history to disable pruning (e.g. if you need eth_getLogs on old blocks).
+  if (!opts.keepHistory && !opts['keep-history']) anvil.push('--prune-history')
 
   // transaction order
   const txOrder = opts.order || opts['transaction-order']
