@@ -33,4 +33,4 @@ ENV ETHSMITH_LOG_LEVEL=info
 ENV NODE_ENV=production
 
 ENTRYPOINT ["node", "/app/bin/ethsmith.js"]
-CMD ["node", "--host", "0.0.0.0", "--deterministic"]
+CMD ["node", "--deterministic"]

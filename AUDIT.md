@@ -5,6 +5,29 @@ Ordered by version. Use this to understand why specific decisions were made.
 
 ---
 
+## v1.3.3 — Dockerfile CMD used unknown `--host` option
+
+### Bug
+`docker run lord1egypt/ethsmith:latest` exited immediately:
+```
+error: unknown option '--host'
+(Did you mean --port?)
+```
+
+### Root Cause
+The Dockerfile's `CMD` was:
+```dockerfile
+CMD ["node", "--host", "0.0.0.0", "--deterministic"]
+```
+`ethsmith node` has no `--host` option. The intent was to bind on all interfaces so the container port is reachable from the host, but `EthsmithProxy` already calls `server.listen(port, '0.0.0.0', ...)` unconditionally — no CLI flag needed.
+
+### Fix
+```dockerfile
+CMD ["node", "--deterministic"]
+```
+
+---
+
 ## v1.3.3 — `net_peerCount` returned "Method not found"
 
 ### Bug

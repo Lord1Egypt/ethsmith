@@ -5,6 +5,8 @@ All notable changes to ethsmith are documented here.
 ## [1.3.3] — 2026-06-06
 
 ### Fixed
+- **Dockerfile CMD crashed on startup** — `CMD ["node", "--host", "0.0.0.0", "--deterministic"]` used
+  an unknown `--host` option. Removed it; the proxy already binds to `0.0.0.0` unconditionally.
 - **`net_peerCount` returned "Method not found"** — Anvil doesn't implement this method.
   Since ethsmith is a local dev node with no P2P peers, the proxy now returns `"0x0"` directly.
   This was the only method `geth attach http://127.0.0.1:8545` required that wasn't working —
