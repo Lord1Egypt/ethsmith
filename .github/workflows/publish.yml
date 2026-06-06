@@ -28,8 +28,14 @@ jobs:
       - name: Run tests before publish
         run: node test/basic.js && node test/persistence.js && node test/highload.js
 
-      - name: Publish to npm
-        run: npm publish --access public
+      - name: Publish to npm (skip if version already exists)
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view ethsmith@$VERSION version 2>/dev/null | grep -q "$VERSION"; then
+            echo "ethsmith@$VERSION already on npm — skipping publish"
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
