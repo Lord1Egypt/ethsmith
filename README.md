@@ -744,13 +744,16 @@ docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork https://eth.llama
 # Fork at a specific block number (reproducible)
 docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork https://eth.llamarpc.com@20000000
 
-# Fork with your own RPC via env var — keeps the URL out of shell history
+# Fork with your own RPC via -e (quick, but key appears in shell history and ps aux)
 docker run -p 8545:8545 \
   -e ETHSMITH_FORK_MAINNET_URL=https://mainnet.infura.io/v3/YOUR_KEY \
   lord1egypt/ethsmith:latest node --fork.network mainnet
 
-# Better for secrets: use --env-file so the key never appears in ps/history
-# Create .env file:  ETHSMITH_FORK_MAINNET_URL=https://mainnet.infura.io/v3/YOUR_KEY
+# Better for secrets: --env-file keeps the key out of shell history, ps aux, and docker inspect args
+# 1. Create .env (add to .gitignore — never commit this file)
+#    ETHSMITH_FORK_MAINNET_URL=https://mainnet.infura.io/v3/YOUR_KEY
+#    ETHSMITH_FORK_SEPOLIA_URL=https://sepolia.infura.io/v3/YOUR_KEY
+# 2. Run with --env-file
 docker run -p 8545:8545 \
   --env-file .env \
   lord1egypt/ethsmith:latest node --fork.network mainnet
