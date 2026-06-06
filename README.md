@@ -3,6 +3,8 @@
 > **The unified Ethereum development toolkit** — Ganache-compatible API, powered by Foundry's Forge + Cast + Anvil + Chisel, with LevelDB persistence.
 
 [![npm version](https://img.shields.io/npm/v/ethsmith)](https://www.npmjs.com/package/ethsmith)
+[![CI](https://github.com/Lord1Egypt/ethsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/Lord1Egypt/ethsmith/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/docker/v/akim92/ethsmith?label=docker)](https://hub.docker.com/r/akim92/ethsmith)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -548,13 +550,13 @@ Each instance has its own LevelDB directory and process — completely independe
 
 ```bash
 # Run with Docker
-docker run -p 8545:8545 lord1egypt/ethsmith
+docker run -p 8545:8545 akim92/ethsmith
 
 # With persistent state
-docker run -p 8545:8545 -v $(pwd)/data:/root/.ethsmith lord1egypt/ethsmith
+docker run -p 8545:8545 -v $(pwd)/data:/root/.ethsmith akim92/ethsmith
 
 # Fork mainnet
-docker run -p 8545:8545 lord1egypt/ethsmith ethsmith --fork.network mainnet
+docker run -p 8545:8545 akim92/ethsmith ethsmith --fork.network mainnet
 
 # docker-compose for multi-instance
 ```
@@ -564,17 +566,53 @@ docker run -p 8545:8545 lord1egypt/ethsmith ethsmith --fork.network mainnet
 version: '3.8'
 services:
   node-dev:
-    image: lord1egypt/ethsmith
+    image: akim92/ethsmith
     ports: ['8545:8545']
     volumes: ['./data/dev:/root/.ethsmith']
     command: ethsmith --deterministic --chain-id 1337
 
   node-fork:
-    image: lord1egypt/ethsmith
+    image: akim92/ethsmith
     ports: ['8546:8545']
     volumes: ['./data/fork:/root/.ethsmith']
     command: ethsmith --fork.network mainnet
 ```
+
+---
+
+## CI/CD Pipeline
+
+ethsmith uses a fully automated CI/CD pipeline:
+
+### Workflows
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| **CI** (`ci.yml`) | push / PR to `main` | Runs all 6 test suites on Node 20 & 22 with Foundry installed |
+| **Release** (`release.yml`) | `git push --tags` with `v*.*.*` | Creates a GitHub Release automatically |
+| **Publish** (`publish.yml`) | GitHub Release created | Runs tests → publishes to npm → builds & pushes Docker image |
+
+### How to release a new version
+
+```bash
+# 1. Bump version in package.json
+npm version patch   # or minor / major
+
+# 2. Push commit + tag
+git push && git push --tags
+# → GitHub Actions creates the Release automatically
+# → Publish workflow fires: npm publish + docker push
+```
+
+### Required GitHub Secrets
+
+Go to `Settings → Secrets → Actions` and add:
+
+| Secret | Value |
+|--------|-------|
+| `NPM_TOKEN` | npm access token (from npmjs.com → Account → Access Tokens) |
+| `DOCKER_USERNAME` | `akim92` |
+| `DOCKER_PASSWORD` | Docker Hub password or access token |
 
 ---
 

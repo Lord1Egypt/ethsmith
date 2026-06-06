@@ -23,9 +23,27 @@
     "evm",
     "hardhat",
     "web3",
-    "development"
+    "development",
+    "ganache-cli",
+    "ganache-replacement",
+    "local-blockchain",
+    "testnet",
+    "smart-contracts",
+    "eip-1559",
+    "eip-1153",
+    "eip-5656",
+    "leveldb",
+    "state-persistence",
+    "defi",
+    "dapp",
+    "node",
+    "rpc"
   ],
-  "author": "Lord1Egypt",
+  "author": {
+    "name": "Mohamed Mounir (Lord1Egypt)",
+    "email": "akim.221992@gmail.com",
+    "url": "https://github.com/Lord1Egypt"
+  },
   "license": "MIT",
   "dependencies": {
     "commander": "^12.0.0",

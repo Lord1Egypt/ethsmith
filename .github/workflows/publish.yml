@@ -55,5 +55,5 @@ jobs:
           context: .
           push: true
           tags: |
-            lord1egypt/ethsmith:latest
-            lord1egypt/ethsmith:${{ steps.version.outputs.version }}
+            akim92/ethsmith:latest
+            akim92/ethsmith:${{ steps.version.outputs.version }}
