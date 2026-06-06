@@ -70,19 +70,24 @@ async function downloadFoundry() {
   const axios = require('axios')
   const tar = require('tar')
 
-  const FOUNDRY_VERSION = 'stable'
-  const FOUNDRY_RELEASES = 'https://github.com/foundry-rs/foundry/releases'
-
   const arch = os.arch() === 'arm64' ? 'arm64' : 'amd64'
   const sys = os.platform()
   let platform
   if (sys === 'darwin') platform = `darwin_${arch}`
   else if (sys === 'linux') platform = `linux_${arch}`
-  else if (sys === 'win32') platform = `windows_amd64`
+  else if (sys === 'win32') platform = `win32_amd64`
   else throw new Error(`Unsupported platform: ${sys}`)
 
-  const ext = platform.startsWith('windows') ? '.zip' : '.tar.gz'
-  const url = `${FOUNDRY_RELEASES}/latest/download/foundry_${FOUNDRY_VERSION}_${platform}${ext}`
+  // Resolve the correct download URL from GitHub API
+  const GITHUB_API = 'https://api.github.com/repos/foundry-rs/foundry/releases/latest'
+  const release = await axios.get(GITHUB_API, {
+    headers: { 'User-Agent': 'ethsmith' },
+    timeout: 30000
+  })
+  const fileExt = platform.startsWith('win32') ? '.zip' : '.tar.gz'
+  const asset = release.data.assets.find(a => a.name.includes(platform) && a.name.endsWith(fileExt))
+  if (!asset) throw new Error(`No Foundry asset found for platform: ${platform}`)
+  const url = asset.browser_download_url
 
   logger.info('Downloading Foundry binaries...', { url, platform })
 

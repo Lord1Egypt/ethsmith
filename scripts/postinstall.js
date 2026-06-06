@@ -1,6 +1,5 @@
 'use strict'
 
-// Escape hatches
 if (process.env.SKIP_ETHSMITH_POSTINSTALL === '1') {
   console.log('ethsmith: skipping Foundry install (SKIP_ETHSMITH_POSTINSTALL=1)')
   process.exit(0)
@@ -12,17 +11,15 @@ const os = require('os')
 const { spawnSync } = require('child_process')
 
 const BIN_DIR = path.join(os.homedir(), '.ethsmith', 'bin')
-const VERSION_FILE = path.join(os.homedir(), '.ethsmith', '.foundry-version')
-const FOUNDRY_VERSION = 'stable'
-const FOUNDRY_RELEASES = 'https://github.com/foundry-rs/foundry/releases'
 const TOOLS = ['forge', 'cast', 'anvil', 'chisel']
+const GITHUB_API = 'https://api.github.com/repos/foundry-rs/foundry/releases/latest'
 
 function getPlatform() {
   const arch = os.arch() === 'arm64' ? 'arm64' : 'amd64'
   const sys = os.platform()
   if (sys === 'darwin') return `darwin_${arch}`
-  if (sys === 'linux') return `linux_${arch}`
-  if (sys === 'win32') return `windows_amd64`
+  if (sys === 'linux')  return `linux_${arch}`
+  if (sys === 'win32')  return `win32_amd64`
   return null
 }
 
@@ -32,10 +29,7 @@ function whichCmd(tool) {
   return r.status === 0 ? r.stdout.toString().trim().split('\n')[0].trim() : null
 }
 
-function anvilInPath() {
-  return whichCmd('anvil') !== null
-}
-
+function anvilInPath()     { return whichCmd('anvil') !== null }
 function managedBinExists() {
   const ext = os.platform() === 'win32' ? '.exe' : ''
   return fs.existsSync(path.join(BIN_DIR, 'anvil' + ext))
@@ -43,32 +37,45 @@ function managedBinExists() {
 
 async function download() {
   let axios, tar
-  try {
-    axios = require('axios')
-    tar = require('tar')
-  } catch {
-    console.warn('ethsmith: cannot load axios/tar — skipping download.')
-    console.warn('  Run "ethsmith install" to install Foundry manually.')
+  try { axios = require('axios'); tar = require('tar') }
+  catch {
+    console.warn('ethsmith: axios/tar unavailable — skipping Foundry download.')
+    console.warn('  Run "ethsmith install" to install manually.')
     return false
   }
 
   const platform = getPlatform()
   if (!platform) {
-    console.warn(`ethsmith: unsupported platform ${os.platform()} ${os.arch()} — skipping download.`)
+    console.warn(`ethsmith: unsupported platform ${os.platform()} ${os.arch()}`)
     console.warn('  Install Foundry manually: https://getfoundry.sh')
     return false
   }
 
-  const ext = platform.startsWith('windows') ? '.zip' : '.tar.gz'
-  const url = `${FOUNDRY_RELEASES}/latest/download/foundry_${FOUNDRY_VERSION}_${platform}${ext}`
-  const tmpFile = path.join(os.tmpdir(), `foundry_ethsmith${ext}`)
+  // Resolve latest Foundry release from GitHub API
+  let downloadUrl
+  try {
+    const res = await axios.get(GITHUB_API, {
+      headers: { 'User-Agent': 'ethsmith-postinstall' },
+      timeout: 30000
+    })
+    const ext = platform.startsWith('win32') ? '.zip' : '.tar.gz'
+    const asset = res.data.assets.find(a => a.name.includes(platform) && a.name.endsWith(ext))
+    if (!asset) throw new Error(`No asset for platform: ${platform}`)
+    downloadUrl = asset.browser_download_url
+  } catch (e) {
+    console.warn(`ethsmith: could not resolve Foundry release: ${e.message}`)
+    console.warn('  Run "ethsmith install" to retry, or: https://getfoundry.sh')
+    return false
+  }
 
   fs.mkdirSync(BIN_DIR, { recursive: true })
+  const ext = downloadUrl.endsWith('.zip') ? '.zip' : '.tar.gz'
+  const tmpFile = path.join(os.tmpdir(), `foundry_ethsmith${ext}`)
 
-  process.stdout.write(`ethsmith: downloading Foundry (forge/cast/anvil/chisel) for ${platform}... `)
+  process.stdout.write(`ethsmith: downloading Foundry for ${platform}... `)
 
   try {
-    const res = await axios({ url, method: 'GET', responseType: 'stream', timeout: 180000 })
+    const res = await axios({ url: downloadUrl, method: 'GET', responseType: 'stream', timeout: 180000 })
     const writer = fs.createWriteStream(tmpFile)
     await new Promise((resolve, reject) => {
       res.data.pipe(writer)
@@ -86,15 +93,10 @@ async function download() {
   try {
     await tar.extract({ file: tmpFile, cwd: BIN_DIR, strip: 0 })
     fs.unlinkSync(tmpFile)
-
-    // make all extracted binaries executable
     for (const tool of TOOLS) {
-      const ext2 = os.platform() === 'win32' ? '.exe' : ''
-      const p = path.join(BIN_DIR, tool + ext2)
+      const p = path.join(BIN_DIR, tool + (os.platform() === 'win32' ? '.exe' : ''))
       if (fs.existsSync(p)) fs.chmodSync(p, 0o755)
     }
-
-    fs.writeFileSync(VERSION_FILE, FOUNDRY_VERSION)
     console.log(`ethsmith: Foundry tools installed → ${BIN_DIR}`)
     return true
   } catch (e) {
@@ -117,7 +119,6 @@ async function main() {
 }
 
 main().catch(e => {
-  // never block the npm install
   console.warn(`ethsmith postinstall warning: ${e.message}`)
   process.exit(0)
 })
