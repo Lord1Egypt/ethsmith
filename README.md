@@ -84,13 +84,16 @@ npm install -g ethsmith
 ```
 npm install -g ethsmith
     └─ postinstall runs
-       └─ downloads Foundry (forge, cast, anvil, chisel) → ~/.ethsmith/bin/
+       ├─ SKIP_ETHSMITH_POSTINSTALL=1 set?  → exit, no download
+       ├─ anvil found in system PATH?        → skip, use existing Foundry install
+       ├─ ~/.ethsmith/bin/anvil exists?      → skip, already installed
+       └─ none of the above                 → download Foundry → ~/.ethsmith/bin/
 
 ethsmith node
     └─ looks for anvil in this order:
        1. ~/.ethsmith/bin/anvil   ← managed copy (installed by postinstall)
-       2. System PATH             ← your existing Foundry install
-       3. Downloads on-demand    ← fallback if neither found
+       2. System PATH             ← your existing global Foundry install
+       3. Downloads on-demand    ← last-resort fallback
 ```
 
 If postinstall was skipped (corporate proxy, offline, `SKIP_ETHSMITH_POSTINSTALL=1`) or you want to upgrade Foundry:
