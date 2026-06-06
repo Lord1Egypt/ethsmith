@@ -1,32 +1,31 @@
 FROM node:22-slim AS base
 
-# Install system deps for LevelDB native bindings + curl for foundryup
+# System deps for LevelDB native bindings
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
     python3 \
     make \
     g++ \
-    git \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Install Foundry (forge, cast, anvil, chisel) ─────────────────────────────
-RUN curl -L https://foundry.paradigm.xyz | bash
-ENV PATH="/root/.foundry/bin:${PATH}"
-RUN foundryup
-
-# ── Install ethsmith ─────────────────────────────────────────────────────────
 WORKDIR /app
+
+# Install deps first — postinstall downloads Foundry to ~/.ethsmith/bin/
 COPY package.json package-lock.json ./
+COPY scripts/ ./scripts/
 RUN npm ci --omit=dev
+
+# Foundry binaries land in ~/.ethsmith/bin/ — add to PATH
+ENV PATH="/root/.ethsmith/bin:${PATH}"
 
 COPY bin/ ./bin/
 COPY src/ ./src/
 
 RUN chmod +x bin/ethsmith.js
 
-# ── Runtime ──────────────────────────────────────────────────────────────────
-VOLUME ["/root/.ethsmith"]
+# Only persist the DB directory, not the entire ~/.ethsmith
+# (binaries stay in the image layer, DB is user data)
+VOLUME ["/root/.ethsmith/db"]
 
 EXPOSE 8545
 

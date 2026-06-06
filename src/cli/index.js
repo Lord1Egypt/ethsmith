@@ -186,6 +186,57 @@ function buildCLI() {
       })
   }
 
+  // ── DOCTOR ────────────────────────────────────────────────────────────────
+  program
+    .command('doctor')
+    .description('Check ethsmith environment: Node version, Foundry tools, DB path')
+    .action(async () => {
+      const { resolveBin, TOOLS, BIN_DIR } = require('../core/binary')
+      const { spawnSync } = require('child_process')
+      const os = require('os')
+      const path = require('path')
+
+      const ok  = (s) => `  \x1b[32m✔\x1b[0m  ${s}`
+      const err = (s) => `  \x1b[31m✖\x1b[0m  ${s}`
+      const warn = (s) => `  \x1b[33m⚠\x1b[0m  ${s}`
+
+      console.log(`\nethsmith doctor — v${pkg.version}\n`)
+
+      // Node version
+      const [major] = process.versions.node.split('.').map(Number)
+      console.log(major >= 20
+        ? ok(`Node.js v${process.versions.node}  (>= 20 required)`)
+        : err(`Node.js v${process.versions.node}  — NEED >= 20`)
+      )
+
+      // Foundry tools
+      let allFound = true
+      for (const tool of TOOLS) {
+        const p = resolveBin(tool)
+        if (p) {
+          const r = spawnSync(p, ['--version'], { stdio: 'pipe' })
+          const ver = r.stdout ? r.stdout.toString().trim().split('\n')[0] : 'unknown'
+          console.log(ok(`${tool.padEnd(7)} ${ver}  (${p})`))
+        } else {
+          console.log(err(`${tool.padEnd(7)} NOT FOUND`))
+          allFound = false
+        }
+      }
+
+      // DB path
+      const dbDir = path.join(os.homedir(), '.ethsmith', 'db')
+      const binDir = BIN_DIR
+      console.log(ok(`DB path  ${dbDir}`))
+      console.log(ok(`Bin dir  ${binDir}`))
+
+      if (!allFound) {
+        console.log(`\n  Run \x1b[33methsmith install\x1b[0m to download missing tools.`)
+      } else {
+        console.log('\n  All systems go!')
+      }
+      console.log()
+    })
+
   // ── CHISEL ─────────────────────────────────────────────────────────────────
   program
     .command('repl [args...]')
