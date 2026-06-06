@@ -12,29 +12,9 @@
 
 ## Demo
 
-```
-$ ethsmith --deterministic
+![ethsmith demo](docs/demo.gif)
 
-⚡ ethsmith v1.3.3
-
-Available Accounts
-==================
-(0) 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 (1000 ETH)
-(1) 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 (1000 ETH)
-...
-
-Chain ID: 1337  |  Port: 8545  |  Hardfork: cancun
-
-2026-06-06 [info] RPC proxy ready {"port":8545}
-2026-06-06 [info] No previous state — starting fresh chain
-
-# 30 seconds later — auto-checkpoint:
-2026-06-06 [info] Checkpoint saved {"block":4,"compressed":"8 KB"}
-
-# Ctrl+C — graceful shutdown:
-2026-06-06 [info] State saved. Restore on next run from block 4.
-```
-
+**Fork mainnet in one flag:**
 ```
 $ ethsmith node --fork.network mainnet --block-time 12
 
@@ -42,6 +22,7 @@ $ ethsmith node --fork.network mainnet --block-time 12
 2026-06-06 [info] RPC proxy ready {"port":8545}
 ```
 
+**`geth attach` works out of the box:**
 ```
 $ geth attach http://127.0.0.1:8545
 Welcome to the Geth JavaScript console!
