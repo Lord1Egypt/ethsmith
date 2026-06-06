@@ -167,7 +167,7 @@ This is the default command — just run `ethsmith` with any options.
 | `--optimism` | | Enable Optimism L2 mode | false |
 | `--init <file>` | | Genesis JSON file | — |
 | `--fund-accounts <addr:eth>` | | Fund address on startup (repeatable) | — |
-| `--prune-history` | | Prune old block history | false |
+| `--keep-history` / `--prune-history` | | Keep full block history (default: pruned) | pruned |
 | `--order <type>` | | TX ordering: `fees` or `fifo` | `fees` |
 | `--log-level <level>` | | `debug` `info` `warn` `error` | `info` |
 | `--log-file <path>` | | Log file path | `~/.ethsmith/logs/` |
@@ -219,7 +219,7 @@ ethsmith deploy src/Token.sol:Token \
 ethsmith deploy src/Token.sol:Token \
   --rpc-url https://mainnet.infura.io/v3/KEY \
   --private-key $PRIVATE_KEY \
-  --verify
+  --verify \
   --etherscan-api-key $ETHERSCAN_KEY
 ```
 
@@ -231,6 +231,18 @@ ethsmith inspect src/Token.sol:Token abi
 ethsmith inspect src/Token.sol:Token bytecode
 ethsmith fmt                        # format all Solidity files
 ethsmith snapshot                   # gas snapshot (forge snapshot)
+```
+
+### Maintenance
+
+```bash
+ethsmith update                     # update Foundry binaries to latest
+ethsmith update --check             # check versions without installing
+ethsmith install                    # (re-)download Foundry to ~/.ethsmith/bin/
+ethsmith doctor                     # verify Node version, binaries, paths, DB
+
+ethsmith clean                      # remove leftover Anvil tmp dirs from crashes
+ethsmith clean --dry-run            # preview what would be deleted and disk reclaimed
 ```
 
 ---
@@ -337,10 +349,10 @@ ethsmith --port 8546 --chain-id 1338 --db ./chainB &
 
 **Why LevelDB instead of Anvil's JSON files?**
 
-| Format | Size (forked mainnet) | Format | Indexed |
-|--------|-----------------------|--------|---------|
-| Anvil JSON | 100 MB+ | Plain text | No |
-| ethsmith LevelDB | ~8 MB | Binary + gzip | Yes |
+| Format | Size (forked mainnet) | Compression | Indexed |
+|--------|-----------------------|-------------|---------|
+| Anvil JSON | 100 MB+ | None (plain text) | No |
+| ethsmith LevelDB | ~8 MB | gzip | Yes |
 
 ---
 
@@ -732,9 +744,15 @@ docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork https://eth.llama
 # Fork at a specific block number (reproducible)
 docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork https://eth.llamarpc.com@20000000
 
-# Fork with your own RPC (env var — keeps the URL out of shell history)
+# Fork with your own RPC via env var — keeps the URL out of shell history
 docker run -p 8545:8545 \
   -e ETHSMITH_FORK_MAINNET_URL=https://mainnet.infura.io/v3/YOUR_KEY \
+  lord1egypt/ethsmith:latest node --fork.network mainnet
+
+# Better for secrets: use --env-file so the key never appears in ps/history
+# Create .env file:  ETHSMITH_FORK_MAINNET_URL=https://mainnet.infura.io/v3/YOUR_KEY
+docker run -p 8545:8545 \
+  --env-file .env \
   lord1egypt/ethsmith:latest node --fork.network mainnet
 
 # Fork + persistent state (fork cache stays across restarts)
@@ -1005,13 +1023,15 @@ docker run -p 8545:8545 -v ethsmith-data:/root/.ethsmith/db lord1egypt/ethsmith:
 <details>
 <summary><b>geth attach: "Method not found" for net_peerCount</b></summary>
 
-This was fixed in v1.3.3. The proxy now returns `"0x0"` for `net_peerCount`.
+This was fixed in v1.3.3. The proxy now returns `"0x0"` for `net_peerCount` directly instead of forwarding to Anvil.
 
+**Upgrade (recommended):**
 ```bash
-npm install -g ethsmith   # upgrades to latest
-# or
-docker pull lord1egypt/ethsmith:latest
+npm install -g ethsmith          # npm
+docker pull lord1egypt/ethsmith:latest  # Docker
 ```
+
+**Workaround without upgrading** — add a small HTTP proxy in front that intercepts `net_peerCount` and returns `{"jsonrpc":"2.0","id":1,"result":"0x0"}`, or just upgrade — it's a one-liner.
 </details>
 
 <details>
@@ -1101,10 +1121,10 @@ ethsmith clean --dry-run  # preview what would be deleted
 | Forge (compile/test) | ❌ | ❌ | ✅ |
 | Cast (call/send/abi) | ❌ | ❌ | ✅ |
 | Chisel (Solidity REPL) | ❌ | ❌ | ✅ |
-| Fork by network name | ✅ | ❌ | ✅ |
+| Fork by network name | ❌ | ❌ | ✅ |
 | `fork.provider` (in-memory) | ✅ | ❌ | ✅ |
 | Optimism L2 support | ❌ | ✅ | ✅ |
-| Node.js >= 20 | ❌ | N/A | ✅ |
+| Node.js >= 20 | ❌ | — | ✅ |
 | Programmatic API | ✅ | ❌ | ✅ |
 
 ---
