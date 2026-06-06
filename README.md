@@ -548,45 +548,266 @@ Each instance has its own LevelDB directory and process — completely independe
 
 ## Docker
 
+### Basic Usage
+
 ```bash
-# Run (ephemeral — fresh chain every restart)
+# Ephemeral — fresh chain every restart (quickest start)
 docker run -p 8545:8545 lord1egypt/ethsmith:latest
 
-# With persistent state — state survives container restarts
-docker run -p 8545:8545 -v ethsmith-data:/root/.ethsmith/db lord1egypt/ethsmith:latest
+# Detached (background)
+docker run -d -p 8545:8545 --name ethsmith lord1egypt/ethsmith:latest
 
-# With persistent state — bind-mount to local folder
-docker run -p 8545:8545 -v $(pwd)/data:/root/.ethsmith/db lord1egypt/ethsmith:latest
-
-# Fork mainnet
-docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network mainnet
-
-# Custom chain ID and deterministic accounts
-docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic --chain-id 31337
+# Stop / restart
+docker stop ethsmith
+docker start ethsmith
 ```
 
-> **Volume path:** always mount to `/root/.ethsmith/db` — Foundry binaries live in `/root/.ethsmith/bin`
-> inside the image layer and must not be shadowed by the volume.
+### Persistent State
+
+```bash
+# Named volume — state survives container restarts and re-creates
+docker run -p 8545:8545 -v ethsmith-data:/root/.ethsmith/db lord1egypt/ethsmith:latest
+
+# Bind-mount — state saved to a local folder you can inspect
+docker run -p 8545:8545 -v ./data:/root/.ethsmith/db lord1egypt/ethsmith:latest
+docker run -p 8545:8545 -v /absolute/path:/root/.ethsmith/db lord1egypt/ethsmith:latest
+```
+
+> **Always mount to `/root/.ethsmith/db`** — not `/root/.ethsmith`.  
+> Foundry binaries are installed to `/root/.ethsmith/bin` inside the image layer; mounting the parent directory shadows them and breaks startup.
+
+### Accounts
+
+```bash
+# Standard deterministic accounts (same 10 addresses every time)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic
+
+# Custom number of accounts
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --accounts 20
+
+# Custom mnemonic
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --mnemonic "your twelve word mnemonic phrase goes here trust me bro"
+
+# Custom starting balance (ETH per account)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic --balance 5000
+
+# Unlock / impersonate a specific address on startup
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic --unlock 0xYourAddress
+```
+
+### Network & Chain
+
+```bash
+# Custom chain ID
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --chain-id 31337
+
+# Custom port inside container (still map 8545 outside)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --port 8545
+
+# Custom gas limit and gas price
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --gas-limit 60000000 --gas-price 1000000000
+
+# Specific EVM hardfork
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --hardfork cancun
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --hardfork shanghai
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --hardfork london
+
+# Optimism L2 mode
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --optimism
+```
+
+### Block Time (Mining)
+
+```bash
+# Default: instamine — every transaction mines a block immediately
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic
+
+# Mine a block every 1 second
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic --block-time 1
+
+# Mine a block every 5 seconds
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic --block-time 5
+
+# Mine a block every 12 seconds (mainnet-like cadence)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --deterministic --block-time 12
+
+# Disable auto-mining entirely (manual mine via RPC only)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --no-mining
+```
+
+### Fork Mode
+
+```bash
+# Fork mainnet (built-in public RPC)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network mainnet
+
+# Fork sepolia testnet
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network sepolia
+
+# Fork other networks by name
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network arbitrum
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network optimism
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network base
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork.network polygon
+
+# Fork from custom RPC URL
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork https://eth.llamarpc.com
+
+# Fork at a specific block number (reproducible)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --fork https://eth.llamarpc.com@20000000
+
+# Fork with your own RPC (env var — keeps the URL out of shell history)
+docker run -p 8545:8545 \
+  -e ETHSMITH_FORK_MAINNET_URL=https://mainnet.infura.io/v3/YOUR_KEY \
+  lord1egypt/ethsmith:latest node --fork.network mainnet
+
+# Fork + persistent state (fork cache stays across restarts)
+docker run -p 8545:8545 \
+  -v ethsmith-fork:/root/.ethsmith/db \
+  lord1egypt/ethsmith:latest node --fork.network mainnet
+```
+
+### Logging
+
+```bash
+# Set log level (debug / info / warn / error)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --log-level debug
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --log-level warn
+
+# Write logs to a file inside the container (mount volume to retrieve them)
+docker run -p 8545:8545 \
+  -v ./logs:/logs \
+  lord1egypt/ethsmith:latest node --log-file /logs/ethsmith.log
+
+# Log level via environment variable
+docker run -p 8545:8545 \
+  -e ETHSMITH_LOG_LEVEL=debug \
+  lord1egypt/ethsmith:latest
+
+# Quiet (errors only) with persistent state
+docker run -p 8545:8545 \
+  -v ethsmith-data:/root/.ethsmith/db \
+  lord1egypt/ethsmith:latest node --log-level error
+```
+
+### State & Performance
+
+```bash
+# Checkpoint every 10 seconds instead of default 30
+docker run -p 8545:8545 \
+  -v ethsmith-data:/root/.ethsmith/db \
+  lord1egypt/ethsmith:latest node --state-interval 10
+
+# Keep full block history (needed for eth_getLogs across old blocks)
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --keep-history
+
+# TX ordering: fifo (first-in-first-out) instead of default fee-priority
+docker run -p 8545:8545 lord1egypt/ethsmith:latest node --order fifo
+```
+
+### All Options Combined
+
+```bash
+# Full example — deterministic, persistent, fork mainnet, 1s blocks, debug logs
+docker run -d \
+  --name ethsmith-dev \
+  -p 8545:8545 \
+  -v ethsmith-data:/root/.ethsmith/db \
+  -e ETHSMITH_FORK_MAINNET_URL=https://eth.llamarpc.com \
+  lord1egypt/ethsmith:latest \
+  node \
+    --deterministic \
+    --accounts 20 \
+    --balance 10000 \
+    --chain-id 1337 \
+    --block-time 1 \
+    --fork.network mainnet \
+    --gas-limit 60000000 \
+    --state-interval 10 \
+    --log-level debug
+```
+
+### docker-compose
 
 ```yaml
 # docker-compose.yml
 version: '3.8'
+
 services:
+  # Local dev node — instamine, deterministic accounts, persistent
   node-dev:
     image: lord1egypt/ethsmith:latest
     ports: ['8545:8545']
     volumes: ['./data/dev:/root/.ethsmith/db']
     command: node --deterministic --chain-id 1337
+    restart: unless-stopped
 
-  node-fork:
+  # Mainnet fork — 12s block time, persistent fork cache
+  node-mainnet-fork:
     image: lord1egypt/ethsmith:latest
     ports: ['8546:8545']
-    volumes: ['./data/fork:/root/.ethsmith/db']
-    command: node --fork.network mainnet
+    volumes: ['./data/fork-mainnet:/root/.ethsmith/db']
+    environment:
+      - ETHSMITH_FORK_MAINNET_URL=https://eth.llamarpc.com
+    command: node --fork.network mainnet --block-time 12 --chain-id 1
+    restart: unless-stopped
+
+  # Sepolia fork — for testnet simulation
+  node-sepolia-fork:
+    image: lord1egypt/ethsmith:latest
+    ports: ['8547:8545']
+    volumes: ['./data/fork-sepolia:/root/.ethsmith/db']
+    command: node --fork.network sepolia --deterministic
+    restart: unless-stopped
+
+  # Silent CI node — no auto-mining, errors only
+  node-ci:
+    image: lord1egypt/ethsmith:latest
+    ports: ['8548:8545']
+    command: node --deterministic --no-mining --log-level error
 
 volumes:
   ethsmith-data:
 ```
+
+### Available `docker run` Flags Reference
+
+| Flag | Example | Description |
+|------|---------|-------------|
+| `--deterministic` | `node --deterministic` | Same 10 accounts every run |
+| `--accounts <n>` | `node --accounts 20` | Number of accounts (default 10) |
+| `--mnemonic <phrase>` | `node --mnemonic "word1 word2..."` | Custom BIP39 mnemonic |
+| `--balance <eth>` | `node --balance 5000` | Starting ETH per account (default 1000) |
+| `--chain-id <id>` | `node --chain-id 31337` | Chain ID (default 1337) |
+| `--port <n>` | `node --port 8545` | RPC port inside container |
+| `--block-time <s>` | `node --block-time 1` | Seconds between blocks (default: instamine) |
+| `--no-mining` | `node --no-mining` | Disable auto-mining |
+| `--fork <url>` | `node --fork https://...` | Fork from RPC URL |
+| `--fork <url@block>` | `node --fork https://...@20000000` | Fork at specific block |
+| `--fork.network <name>` | `node --fork.network mainnet` | Fork by name |
+| `--hardfork <name>` | `node --hardfork cancun` | EVM hardfork |
+| `--gas-limit <n>` | `node --gas-limit 60000000` | Block gas limit |
+| `--gas-price <wei>` | `node --gas-price 1000000000` | Minimum gas price |
+| `--unlock <addr>` | `node --unlock 0xABC...` | Impersonate address on startup |
+| `--state-interval <s>` | `node --state-interval 10` | LevelDB checkpoint interval |
+| `--keep-history` | `node --keep-history` | Keep full block history |
+| `--order <type>` | `node --order fifo` | TX ordering: `fees` or `fifo` |
+| `--optimism` | `node --optimism` | Enable Optimism L2 mode |
+| `--log-level <level>` | `node --log-level debug` | Log verbosity |
+| `--log-file <path>` | `node --log-file /logs/node.log` | Write logs to file |
+
+**Environment variables:**
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `ETHSMITH_LOG_LEVEL` | `debug` | Log level (alternative to `--log-level`) |
+| `ETHSMITH_LOG_FILE` | `/logs/ethsmith.log` | Log file path |
+| `ETHSMITH_FORK_MAINNET_URL` | `https://...` | Override mainnet RPC endpoint |
+| `ETHSMITH_FORK_SEPOLIA_URL` | `https://...` | Override sepolia RPC endpoint |
+| `ETHSMITH_FORK_ARBITRUM_URL` | `https://...` | Override arbitrum RPC endpoint |
+| `ETHSMITH_FORK_OPTIMISM_URL` | `https://...` | Override optimism RPC endpoint |
+| `ETHSMITH_FORK_BASE_URL` | `https://...` | Override base RPC endpoint |
+| `ETHSMITH_FORK_POLYGON_URL` | `https://...` | Override polygon RPC endpoint |
 
 ---
 
