@@ -388,6 +388,127 @@ function buildCLI() {
       await updateFoundry(opts)
     })
 
+  // ── STATUS ────────────────────────────────────────────────────────────────
+  program
+    .command('status')
+    .description('Show running node status: block number, chain ID, accounts, port')
+    .option('-p, --port <port>', 'RPC port to query', '8545')
+    .action(async (opts) => {
+      const http = require('http')
+      const port = parseInt(opts.port, 10)
+
+      function rpc (method, params = []) {
+        return new Promise((resolve, reject) => {
+          const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+          const req = http.request({ host: '127.0.0.1', port, path: '/', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+          }, res => {
+            let data = ''
+            res.on('data', c => { data += c })
+            res.on('end', () => {
+              try { resolve(JSON.parse(data).result) } catch { reject(new Error('bad response')) }
+            })
+          })
+          req.on('error', reject)
+          req.setTimeout(3000, () => { req.destroy(); reject(new Error('timeout')) })
+          req.write(body)
+          req.end()
+        })
+      }
+
+      const ok  = s => `  \x1b[32m✔\x1b[0m  ${s}`
+      const err = s => `  \x1b[31m✖\x1b[0m  ${s}`
+
+      console.log(`\nethsmith status — port ${port}\n`)
+
+      try {
+        const [blockHex, chainHex, accounts] = await Promise.all([
+          rpc('eth_blockNumber'),
+          rpc('eth_chainId'),
+          rpc('eth_accounts'),
+        ])
+        const block = parseInt(blockHex, 16)
+        const chain = parseInt(chainHex, 16)
+
+        console.log(ok(`Node     running on http://127.0.0.1:${port}`))
+        console.log(ok(`Chain ID ${chain}`))
+        console.log(ok(`Block    #${block}`))
+        console.log(ok(`Accounts ${accounts.length}`))
+        if (accounts.length) {
+          const bals = await Promise.all(accounts.slice(0, 5).map(a => rpc('eth_getBalance', [a, 'latest'])))
+          console.log()
+          accounts.slice(0, 5).forEach((a, i) => {
+            const eth = (BigInt(bals[i]) * 100n / 10n ** 18n)
+            const display = `${eth / 100n}.${String(eth % 100n).padStart(2, '0')}`
+            console.log(`       ${a}  ${display} ETH`)
+          })
+          if (accounts.length > 5) console.log(`       ... and ${accounts.length - 5} more`)
+        }
+        console.log()
+      } catch (e) {
+        console.log(err(`No node running on port ${port}  (${e.message})`))
+        console.log(`\n  Start one with: \x1b[33methsmith\x1b[0m\n`)
+        process.exit(1)
+      }
+    })
+
+  // ── ACCOUNTS ──────────────────────────────────────────────────────────────
+  program
+    .command('accounts')
+    .description('List accounts and ETH balances from the running node')
+    .option('-p, --port <port>', 'RPC port to query', '8545')
+    .option('--json', 'output as JSON')
+    .action(async (opts) => {
+      const http = require('http')
+      const port = parseInt(opts.port, 10)
+
+      function rpc (method, params = []) {
+        return new Promise((resolve, reject) => {
+          const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+          const req = http.request({ host: '127.0.0.1', port, path: '/', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+          }, res => {
+            let data = ''
+            res.on('data', c => { data += c })
+            res.on('end', () => {
+              try { resolve(JSON.parse(data).result) } catch { reject(new Error('bad response')) }
+            })
+          })
+          req.on('error', reject)
+          req.setTimeout(3000, () => { req.destroy(); reject(new Error('timeout')) })
+          req.write(body)
+          req.end()
+        })
+      }
+
+      try {
+        const accounts = await rpc('eth_accounts')
+        const bals = await Promise.all(accounts.map(a => rpc('eth_getBalance', [a, 'latest'])))
+
+        const result = accounts.map((a, i) => {
+          const wei = BigInt(bals[i])
+          const eth = Number(wei) / 1e18
+          return { address: a, balance_wei: bals[i], balance_eth: eth.toFixed(4) }
+        })
+
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2))
+          return
+        }
+
+        console.log(`\n  Accounts (${result.length} total)\n`)
+        result.forEach((r, i) => {
+          console.log(`  [${i}] ${r.address}`)
+          console.log(`       ${r.balance_eth} ETH`)
+        })
+        console.log()
+      } catch (e) {
+        console.error(`  No node on port ${port}: ${e.message}`)
+        console.error(`  Start one with: ethsmith`)
+        process.exit(1)
+      }
+    })
+
   // ── CHISEL ─────────────────────────────────────────────────────────────────
   program
     .command('repl [args...]')
